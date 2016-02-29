@@ -156,6 +156,10 @@ int EVP_PKEY_encrypt_init(EVP_PKEY_CTX *);
 int EVP_PKEY_decrypt_init(EVP_PKEY_CTX *);
 int EVP_PKEY_id(const EVP_PKEY *);
 
+int EVP_PKEY_derive_init(EVP_PKEY_CTX *ctx);
+int EVP_PKEY_derive_set_peer(EVP_PKEY_CTX *ctx, EVP_PKEY *peer);
+int EVP_PKEY_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen);
+
 /* The following were macros in 0.9.8e. Once we drop support for RHEL/CentOS 5
    we should move these back to FUNCTIONS. */
 const EVP_CIPHER *EVP_CIPHER_CTX_cipher(const EVP_CIPHER_CTX *);
