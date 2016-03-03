@@ -166,15 +166,15 @@ def get_mgf(backend, padding):
 def _xor(a, b):
     assert len(a) == len(b)
     i = 0
-    result = array("B")
+    result = array("B", a)
     if six.PY3:
         while i < len(a):
-            result.append(a[i] ^ b[i])
+            result[i] ^= b[i]
             i += 1
         return result.tobytes()
     else:
         while i < len(a):
-            result.append(ord(a[i]) ^ ord(b[i]))
+            result[i] ^= ord(b[i])
             i += 1
         return result.tostring()
 
