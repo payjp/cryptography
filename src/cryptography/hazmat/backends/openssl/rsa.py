@@ -4,7 +4,12 @@
 
 from __future__ import absolute_import, division, print_function
 
+from array import array
 import math
+import os
+import struct
+
+import six
 
 from cryptography import utils
 from cryptography.exceptions import (
@@ -49,21 +54,10 @@ def _enc_dec_rsa(backend, key, data, padding):
                 _Reasons.UNSUPPORTED_MGF
             )
 
-        if not isinstance(padding._mgf._algorithm, hashes.SHA1):
-            raise UnsupportedAlgorithm(
-                "This backend supports only SHA1 inside MGF1 when "
-                "using OAEP.",
-                _Reasons.UNSUPPORTED_HASH
-            )
-
-        if padding._label is not None and padding._label != b"":
-            raise ValueError("This backend does not support OAEP labels.")
-
-        if not isinstance(padding._algorithm, hashes.SHA1):
-            raise UnsupportedAlgorithm(
-                "This backend only supports SHA1 when using OAEP.",
-                _Reasons.UNSUPPORTED_HASH
-            )
+        if not isinstance(padding._mgf._algorithm, hashes.SHA1) or \
+           (padding._label is not None and padding._label != b"") or \
+           not isinstance(padding._algorithm, hashes.SHA1):
+            return _enc_dec_rsa_oaep_default(backend, key, data, padding)
     else:
         raise UnsupportedAlgorithm(
             "{0} is not supported by this backend.".format(
@@ -121,6 +115,137 @@ def _enc_dec_rsa_098(backend, key, data, padding_enum):
         _handle_rsa_enc_dec_error(backend, key)
 
     return backend._ffi.buffer(buf)[:res]
+
+
+def _i2osp(x, xlen):
+    if six.PY3:
+        return x.to_bytes(xlen, 'big', signed=False)
+    else:
+        c = xlen
+        b = []
+        while c > 0:
+            q = x // 4294967296
+            r = x - q * 4294967296
+            x = q
+            b.insert(0, struct.pack('>I', r))
+            c -= 4
+        return b''.join(b)[-xlen:]
+
+
+class MGF1Generator(object):
+    def __init__(self, backend, algorithm):
+        self.backend = backend
+        self.algorithm = algorithm
+
+    def __call__(self, seed, l):
+        hlen = self.algorithm.digest_size
+        if l > 2 ** 32 * hlen:
+            raise ValueError('mask too long')
+        cne = (l + (hlen - 1)) // hlen
+        cn = 0
+        t = []
+        while cn < cne:
+            hasher = hashes.Hash(self.algorithm, self.backend)
+            hasher.update(seed)
+            hasher.update(struct.pack('>I', cn))
+            t.append(hasher.finalize())
+            cn += 1
+        return b''.join(t)[0:l]
+
+
+def get_mgf(backend, padding):
+    if isinstance(padding._mgf, MGF1):
+        return MGF1Generator(backend, padding._mgf._algorithm)
+    else:
+        raise UnsupportedAlgorithm(
+            "Only MGF1 is supported by this backend.",
+            _Reasons.UNSUPPORTED_MGF
+        )
+
+
+def _xor(a, b):
+    assert len(a) == len(b)
+    i = 0
+    result = array("B", a)
+    if six.PY3:
+        while i < len(a):
+            result[i] ^= b[i]
+            i += 1
+        return result.tobytes()
+    else:
+        while i < len(a):
+            result[i] ^= ord(b[i])
+            i += 1
+        return result.tostring()
+
+
+def _rsaep(backend, key, data):
+    if backend._lib.Cryptography_HAS_PKEY_CTX:
+        return _enc_dec_rsa_pkey_ctx(backend, key, data, backend._lib.RSA_NO_PADDING)
+    else:
+        return _enc_dec_rsa_098(backend, key, data, backend._lib.RSA_NO_PADDING)
+
+
+_rsadp = _rsaep
+
+
+def _enc_rsa_oaep_default(backend, key, data, padding):
+    mgf = get_mgf(backend, padding)
+    k = key.key_size // 8
+    hlen = padding._algorithm.digest_size
+    padded_len = k - 2 * hlen - 2
+    if len(data) > padded_len:
+        raise ValueError("Message too long.")
+    hasher = hashes.Hash(padding._algorithm, backend)
+    hasher.update(padding._label)
+    lhash = hasher.finalize()
+    db = lhash + (b'\x00' * (padded_len - len(data))) + b'\x01' + data
+    seed = os.urandom(hlen)
+    dbmask = mgf(seed, k - hlen - 1)
+    assert len(db) == len(dbmask)
+    maskeddb = _xor(db, dbmask)
+    seedmask = mgf(maskeddb, hlen)
+    maskedseed = _xor(seed, seedmask)
+    em = b'\x00' + maskedseed + maskeddb
+    return _rsaep(backend, key, em)
+
+
+def _dec_rsa_oaep_default(backend, key, data, padding):
+    mgf = get_mgf(backend, padding)
+    k = key.key_size // 8
+    if len(data) != k:
+        raise ValueError("Ciphertext must be %d octet length." % k)
+    hlen = padding._algorithm.digest_size
+    padded_len = k - 2 * hlen - 2
+    if padded_len < 0:
+        raise ValueError("Key too short for the digest size.")
+    em = _rsadp(backend, key, data)
+    if em[0:1] != b'\x00':
+        raise ValueError("Invalid message.")
+    maskedseed = em[1:hlen + 1]
+    maskeddb = em[hlen+1:]
+    seedmask = mgf(maskeddb, hlen)
+    seed = _xor(maskedseed, seedmask)
+    dbmask = mgf(seed, k - hlen - 1)
+    db = _xor(maskeddb, dbmask)
+    lhash = db[0:hlen]
+    p = db[hlen:].index(b'\x01')
+    if p < 0:
+        raise ValueError("Invalid message.")
+    m = db[hlen + p + 1:]
+    hasher = hashes.Hash(padding._algorithm, backend)
+    hasher.update(padding._label)
+    lhash_calculated = hasher.finalize()
+    if lhash != lhash_calculated:
+        raise ValueError("Lhash does not match.")
+    return m
+
+
+def _enc_dec_rsa_oaep_default(backend, key, data, padding):
+    if isinstance(key, _RSAPublicKey):
+        return _enc_rsa_oaep_default(backend, key, data, padding)
+    else:
+        return _dec_rsa_oaep_default(backend, key, data, padding)
 
 
 def _handle_rsa_enc_dec_error(backend, key):
