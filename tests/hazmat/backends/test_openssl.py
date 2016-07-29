@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function
 
 import datetime
+import itertools
 import os
 import subprocess
 import sys
@@ -21,15 +22,17 @@ from cryptography.hazmat.backends.openssl.backend import (
 from cryptography.hazmat.backends.openssl.ec import _sn_to_elliptic_curve
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, padding
-from cryptography.hazmat.primitives.ciphers import (
-    BlockCipherAlgorithm, Cipher, CipherAlgorithm
-)
+from cryptography.hazmat.primitives.ciphers import Cipher
 from cryptography.hazmat.primitives.ciphers.algorithms import AES
-from cryptography.hazmat.primitives.ciphers.modes import CBC, CTR, Mode
+from cryptography.hazmat.primitives.ciphers.modes import CBC, CTR
 
 from ..primitives.fixtures_dsa import DSA_KEY_2048
 from ..primitives.fixtures_rsa import RSA_KEY_2048, RSA_KEY_512
 from ..primitives.test_ec import _skip_curve_unsupported
+from ...doubles import (
+    DummyAsymmetricPadding, DummyCipherAlgorithm, DummyHashAlgorithm, DummyMode
+)
+from ...test_x509 import _load_cert
 from ...utils import load_vectors_from_file, raises_unsupported_algorithm
 
 
@@ -40,37 +43,11 @@ def skip_if_libre_ssl(openssl_version):
 
 class TestLibreSkip(object):
     def test_skip_no(self):
-        assert skip_if_libre_ssl(u"OpenSSL 0.9.8zf 19 Mar 2015") is None
+        assert skip_if_libre_ssl(u"OpenSSL 1.0.2h  3 May 2016") is None
 
     def test_skip_yes(self):
         with pytest.raises(pytest.skip.Exception):
             skip_if_libre_ssl(u"LibreSSL 2.1.6")
-
-
-@utils.register_interface(Mode)
-class DummyMode(object):
-    name = "dummy-mode"
-
-    def validate_for_algorithm(self, algorithm):
-        pass
-
-
-@utils.register_interface(CipherAlgorithm)
-class DummyCipher(object):
-    name = "dummy-cipher"
-    key_size = None
-
-
-@utils.register_interface(padding.AsymmetricPadding)
-class DummyPadding(object):
-    name = "dummy-cipher"
-
-
-@utils.register_interface(hashes.HashAlgorithm)
-class DummyHash(object):
-    name = "dummy-hash"
-    block_size = None
-    digest_size = None
 
 
 class DummyMGF(object):
@@ -99,7 +76,7 @@ class TestOpenSSL(object):
         assert backend.cipher_supported(None, None) is False
 
     def test_aes_ctr_always_available(self):
-        # AES CTR should always be available in both 0.9.8 and 1.0.0+
+        # AES CTR should always be available, even in 1.0.0.
         assert backend.cipher_supported(AES(b"\x00" * 16),
                                         CTR(b"\x00" * 16)) is True
 
@@ -111,12 +88,12 @@ class TestOpenSSL(object):
     def test_nonexistent_cipher(self, mode):
         b = Backend()
         b.register_cipher_adapter(
-            DummyCipher,
+            DummyCipherAlgorithm,
             type(mode),
             lambda backend, cipher, mode: backend._ffi.NULL
         )
         cipher = Cipher(
-            DummyCipher(), mode, backend=b,
+            DummyCipherAlgorithm(), mode, backend=b,
         )
         with raises_unsupported_algorithm(_Reasons.UNSUPPORTED_CIPHER):
             cipher.encryptor()
@@ -165,27 +142,6 @@ class TestOpenSSL(object):
         with pytest.raises(InternalError):
             enc.finalize()
 
-    def test_derive_pbkdf2_raises_unsupported_on_old_openssl(self):
-        if backend.pbkdf2_hmac_supported(hashes.SHA256()):
-            pytest.skip("Requires an older OpenSSL")
-        with raises_unsupported_algorithm(_Reasons.UNSUPPORTED_HASH):
-            backend.derive_pbkdf2_hmac(hashes.SHA256(), 10, b"", 1000, b"")
-
-    @pytest.mark.skipif(
-        backend._lib.OPENSSL_VERSION_NUMBER >= 0x1000000f,
-        reason="Requires an older OpenSSL. Must be < 1.0.0"
-    )
-    def test_large_key_size_on_old_openssl(self):
-        with pytest.raises(ValueError):
-            dsa.generate_parameters(2048, backend=backend)
-
-        with pytest.raises(ValueError):
-            dsa.generate_parameters(3072, backend=backend)
-
-    @pytest.mark.skipif(
-        backend._lib.OPENSSL_VERSION_NUMBER < 0x1000000f,
-        reason="Requires a newer OpenSSL. Must be >= 1.0.0"
-    )
     def test_large_key_size_on_new_openssl(self):
         parameters = dsa.generate_parameters(2048, backend)
         param_num = parameters.parameter_numbers()
@@ -232,7 +188,16 @@ class TestOpenSSL(object):
 
 
 class TestOpenSSLRandomEngine(object):
-    def teardown_method(self, method):
+    def setup(self):
+        # The default RAND engine is global and shared between
+        # tests. We make sure that the default engine is osrandom
+        # before we start each test and restore the global state to
+        # that engine in teardown.
+        current_default = backend._lib.ENGINE_get_default_RAND()
+        name = backend._lib.ENGINE_get_name(current_default)
+        assert name == backend._binding._osrandom_engine_name
+
+    def teardown(self):
         # we need to reset state to being default. backend is a shared global
         # for all these tests.
         backend.activate_osrandom_engine()
@@ -240,6 +205,8 @@ class TestOpenSSLRandomEngine(object):
         name = backend._lib.ENGINE_get_name(current_default)
         assert name == backend._binding._osrandom_engine_name
 
+    @pytest.mark.skipif(sys.executable is None,
+                        reason="No Python interpreter available.")
     def test_osrandom_engine_is_default(self, tmpdir):
         engine_printer = textwrap.dedent(
             """
@@ -353,7 +320,7 @@ class TestOpenSSLRSA(object):
                                              key_size=256)
 
     @pytest.mark.skipif(
-        backend._lib.OPENSSL_VERSION_NUMBER >= 0x1000100f,
+        backend._lib.CRYPTOGRAPHY_OPENSSL_101_OR_GREATER,
         reason="Requires an older OpenSSL. Must be < 1.0.1"
     )
     def test_non_sha1_pss_mgf1_hash_algorithm_on_old_openssl(self):
@@ -383,11 +350,11 @@ class TestOpenSSLRSA(object):
 
     def test_rsa_padding_unsupported_pss_mgf1_hash(self):
         assert backend.rsa_padding_supported(
-            padding.PSS(mgf=padding.MGF1(DummyHash()), salt_length=0)
+            padding.PSS(mgf=padding.MGF1(DummyHashAlgorithm()), salt_length=0)
         ) is False
 
     def test_rsa_padding_unsupported(self):
-        assert backend.rsa_padding_supported(DummyPadding()) is False
+        assert backend.rsa_padding_supported(DummyAsymmetricPadding()) is False
 
     def test_rsa_padding_supported_pkcs1v15(self):
         assert backend.rsa_padding_supported(padding.PKCS1v15()) is True
@@ -406,6 +373,45 @@ class TestOpenSSLRSA(object):
             ),
         ) is True
 
+    @pytest.mark.skipif(
+        backend._lib.Cryptography_HAS_RSA_OAEP_MD == 0,
+        reason="Requires OpenSSL with rsa_oaep_md (1.0.2+)"
+    )
+    def test_rsa_padding_supported_oaep_sha2_combinations(self):
+        hashalgs = [
+            hashes.SHA1(),
+            hashes.SHA224(),
+            hashes.SHA256(),
+            hashes.SHA384(),
+            hashes.SHA512(),
+        ]
+        for mgf1alg, oaepalg in itertools.product(hashalgs, hashalgs):
+            assert backend.rsa_padding_supported(
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=mgf1alg),
+                    algorithm=oaepalg,
+                    label=None
+                ),
+            ) is True
+
+    def test_rsa_padding_unsupported_oaep_ripemd160_sha1(self):
+        assert backend.rsa_padding_supported(
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.RIPEMD160()),
+                algorithm=hashes.SHA1(),
+                label=None
+            ),
+        ) is False
+
+    def test_rsa_padding_unsupported_oaep_sha1_ripemd160(self):
+        assert backend.rsa_padding_supported(
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA1()),
+                algorithm=hashes.RIPEMD160(),
+                label=None
+            ),
+        ) is False
+
     def test_rsa_padding_unsupported_mgf(self):
         assert backend.rsa_padding_supported(
             padding.OAEP(
@@ -419,9 +425,13 @@ class TestOpenSSLRSA(object):
             padding.PSS(mgf=DummyMGF(), salt_length=0)
         ) is False
 
+    @pytest.mark.skipif(
+        backend._lib.Cryptography_HAS_RSA_OAEP_MD == 1,
+        reason="Requires OpenSSL without rsa_oaep_md (< 1.0.2)"
+    )
     def test_unsupported_mgf1_hash_algorithm_decrypt(self):
         private_key = RSA_KEY_512.private_key(backend)
-        with raises_unsupported_algorithm(_Reasons.UNSUPPORTED_HASH):
+        with raises_unsupported_algorithm(_Reasons.UNSUPPORTED_PADDING):
             private_key.decrypt(
                 b"0" * 64,
                 padding.OAEP(
@@ -431,14 +441,42 @@ class TestOpenSSLRSA(object):
                 )
             )
 
+    @pytest.mark.skipif(
+        backend._lib.Cryptography_HAS_RSA_OAEP_MD == 1,
+        reason="Requires OpenSSL without rsa_oaep_md (< 1.0.2)"
+    )
     def test_unsupported_oaep_hash_algorithm_decrypt(self):
         private_key = RSA_KEY_512.private_key(backend)
-        with raises_unsupported_algorithm(_Reasons.UNSUPPORTED_HASH):
+        with raises_unsupported_algorithm(_Reasons.UNSUPPORTED_PADDING):
             private_key.decrypt(
                 b"0" * 64,
                 padding.OAEP(
                     mgf=padding.MGF1(algorithm=hashes.SHA1()),
                     algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+
+    def test_unsupported_mgf1_hash_algorithm_ripemd160_decrypt(self):
+        private_key = RSA_KEY_512.private_key(backend)
+        with raises_unsupported_algorithm(_Reasons.UNSUPPORTED_PADDING):
+            private_key.decrypt(
+                b"0" * 64,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.RIPEMD160()),
+                    algorithm=hashes.RIPEMD160(),
+                    label=None
+                )
+            )
+
+    def test_unsupported_mgf1_hash_algorithm_whirlpool_decrypt(self):
+        private_key = RSA_KEY_512.private_key(backend)
+        with raises_unsupported_algorithm(_Reasons.UNSUPPORTED_PADDING):
+            private_key.decrypt(
+                b"0" * 64,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.Whirlpool()),
+                    algorithm=hashes.Whirlpool(),
                     label=None
                 )
             )
@@ -457,22 +495,18 @@ class TestOpenSSLRSA(object):
 
 
 @pytest.mark.skipif(
-    backend._lib.OPENSSL_VERSION_NUMBER <= 0x10001000,
+    backend._lib.CRYPTOGRAPHY_OPENSSL_LESS_THAN_101,
     reason="Requires an OpenSSL version >= 1.0.1"
 )
 class TestOpenSSLCMAC(object):
     def test_unsupported_cipher(self):
-        @utils.register_interface(BlockCipherAlgorithm)
-        class FakeAlgorithm(object):
-            block_size = 64
-
         with raises_unsupported_algorithm(_Reasons.UNSUPPORTED_CIPHER):
-            backend.create_cmac_ctx(FakeAlgorithm())
+            backend.create_cmac_ctx(DummyCipherAlgorithm())
 
 
 class TestOpenSSLCreateX509CSR(object):
     @pytest.mark.skipif(
-        backend._lib.OPENSSL_VERSION_NUMBER >= 0x10001000,
+        backend._lib.CRYPTOGRAPHY_OPENSSL_101_OR_GREATER,
         reason="Requires an older OpenSSL. Must be < 1.0.1"
     )
     def test_unsupported_dsa_keys(self):
@@ -482,7 +516,7 @@ class TestOpenSSLCreateX509CSR(object):
             backend.create_x509_csr(object(), private_key, hashes.SHA1())
 
     @pytest.mark.skipif(
-        backend._lib.OPENSSL_VERSION_NUMBER >= 0x10001000,
+        backend._lib.CRYPTOGRAPHY_OPENSSL_101_OR_GREATER,
         reason="Requires an older OpenSSL. Must be < 1.0.1"
     )
     def test_unsupported_ec_keys(self):
@@ -498,10 +532,12 @@ class TestOpenSSLSignX509Certificate(object):
         private_key = RSA_KEY_2048.private_key(backend)
 
         with pytest.raises(TypeError):
-            backend.create_x509_certificate(object(), private_key, DummyHash())
+            backend.create_x509_certificate(
+                object(), private_key, DummyHashAlgorithm()
+            )
 
     @pytest.mark.skipif(
-        backend._lib.OPENSSL_VERSION_NUMBER >= 0x10001000,
+        backend._lib.CRYPTOGRAPHY_OPENSSL_101_OR_GREATER,
         reason="Requires an older OpenSSL. Must be < 1.0.1"
     )
     def test_sign_with_dsa_private_key_is_unsupported(self):
@@ -525,7 +561,7 @@ class TestOpenSSLSignX509Certificate(object):
             builder.sign(private_key, hashes.SHA512(), backend)
 
     @pytest.mark.skipif(
-        backend._lib.OPENSSL_VERSION_NUMBER >= 0x10001000,
+        backend._lib.CRYPTOGRAPHY_OPENSSL_101_OR_GREATER,
         reason="Requires an older OpenSSL. Must be < 1.0.1"
     )
     def test_sign_with_ec_private_key_is_unsupported(self):
@@ -558,7 +594,7 @@ class TestOpenSSLSignX509CertificateRevocationList(object):
             backend.create_x509_crl(object(), private_key, hashes.SHA256())
 
     @pytest.mark.skipif(
-        backend._lib.OPENSSL_VERSION_NUMBER >= 0x10001000,
+        backend._lib.CRYPTOGRAPHY_OPENSSL_101_OR_GREATER,
         reason="Requires an older OpenSSL. Must be < 1.0.1"
     )
     def test_sign_with_dsa_private_key_is_unsupported(self):
@@ -576,7 +612,7 @@ class TestOpenSSLSignX509CertificateRevocationList(object):
             builder.sign(private_key, hashes.SHA1(), backend)
 
     @pytest.mark.skipif(
-        backend._lib.OPENSSL_VERSION_NUMBER >= 0x10001000,
+        backend._lib.CRYPTOGRAPHY_OPENSSL_101_OR_GREATER,
         reason="Requires an older OpenSSL. Must be < 1.0.1"
     )
     def test_sign_with_ec_private_key_is_unsupported(self):
@@ -683,3 +719,19 @@ class TestRSAPEMSerialization(object):
                 serialization.PrivateFormat.PKCS8,
                 serialization.BestAvailableEncryption(password)
             )
+
+
+class TestGOSTCertificate(object):
+    def test_numeric_string_x509_name_entry(self):
+        cert = _load_cert(
+            os.path.join("x509", "e-trust.ru.der"),
+            x509.load_der_x509_certificate,
+            backend
+        )
+        with pytest.raises(ValueError) as exc:
+            cert.subject
+
+        # We assert on the message in this case because if the certificate
+        # fails to load it will also raise a ValueError and this test could
+        # erroneously pass.
+        assert str(exc.value) == "Unsupported ASN1 string type. Type: 18"

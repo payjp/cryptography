@@ -1,15 +1,90 @@
 Changelog
 =========
 
-1.3 - `master`_
+1.5 - `master`_
 ~~~~~~~~~~~~~~~
 
 .. note:: This version is not yet released and is under active development.
 
+* Added
+  :func:`~cryptography.hazmat.primitives.asymmetric.padding.calculate_max_pss_salt_length`.
+* Added "one shot"
+  :meth:`~cryptography.hazmat.primitives.asymmetric.dsa.DSAPrivateKey.sign`
+  and
+  :meth:`~cryptography.hazmat.primitives.asymmetric.dsa.DSAPublicKey.verify`
+  methods to DSA keys.
+* Added "one shot"
+  :meth:`~cryptography.hazmat.primitives.asymmetric.ec.EllipticCurvePrivateKey.sign`
+  and
+  :meth:`~cryptography.hazmat.primitives.asymmetric.ec.EllipticCurvePublicKey.verify`
+  methods to ECDSA keys.
+
+
+1.4 - 2016-06-04
+~~~~~~~~~~~~~~~~
+
+* Support for OpenSSL 0.9.8 has been removed. Users on older versions of
+  OpenSSL will need to upgrade.
+* Added :class:`~cryptography.hazmat.primitives.kdf.kbkdf.KBKDFHMAC`.
+* Added support for ``OpenSSH`` public key serialization.
+* Added support for SHA-2 in RSA
+  :class:`~cryptography.hazmat.primitives.asymmetric.padding.OAEP` when using
+  OpenSSL 1.0.2 or greater.
+* Added "one shot"
+  :meth:`~cryptography.hazmat.primitives.asymmetric.rsa.RSAPrivateKey.sign`
+  and
+  :meth:`~cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey.verify`
+  methods to RSA keys.
+
+
+1.3.4 - 2016-06-03
+~~~~~~~~~~~~~~~~~~
+
+* Added another OpenSSL function to the bindings to support an upcoming
+  ``pyOpenSSL`` release.
+
+
+1.3.3 - 2016-06-02
+~~~~~~~~~~~~~~~~~~
+
+* Added two new OpenSSL functions to the bindings to support an upcoming
+  ``pyOpenSSL`` release.
+
+1.3.2 - 2016-05-04
+~~~~~~~~~~~~~~~~~~
+
+* Updated Windows and OS X wheels to be compiled against OpenSSL 1.0.2h.
+* Fixed an issue preventing ``cryptography`` from compiling against
+  LibreSSL 2.3.x.
+
+1.3.1 - 2016-03-21
+~~~~~~~~~~~~~~~~~~
+
+* Fixed a bug that caused an ``AttributeError`` when using ``mock`` to patch
+  some ``cryptography`` modules.
+
+1.3 - 2016-03-18
+~~~~~~~~~~~~~~~~
+
+* Added support for padding ANSI X.923 with
+  :class:`~cryptography.hazmat.primitives.padding.ANSIX923`.
 * Deprecated support for OpenSSL 0.9.8. Support will be removed in
   ``cryptography`` 1.4.
-* Added support for the :class:`~cryptography.x509.PolicyConstraints` X.509
-  extension.
+* Added support for the :class:`~cryptography.x509.PolicyConstraints`
+  X.509 extension including both parsing and generation using
+  :class:`~cryptography.x509.CertificateBuilder` and
+  :class:`~cryptography.x509.CertificateSigningRequestBuilder`.
+* Added :attr:`~cryptography.x509.CertificateSigningRequest.is_signature_valid`
+  to :class:`~cryptography.x509.CertificateSigningRequest`.
+* Fixed an intermittent ``AssertionError`` when performing an RSA decryption on
+  an invalid ciphertext, ``ValueError`` is now correctly raised in all cases.
+* Added
+  :meth:`~cryptography.x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier`.
+
+1.2.3 - 2016-03-01
+~~~~~~~~~~~~~~~~~~
+
+* Updated Windows and OS X wheels to be compiled against OpenSSL 1.0.2g.
 
 1.2.2 - 2016-01-29
 ~~~~~~~~~~~~~~~~~~
@@ -620,4 +695,4 @@ Changelog
 * Initial release.
 
 .. _`master`: https://github.com/pyca/cryptography/
-.. _`cffi`: https://cffi.readthedocs.org/en/latest/
+.. _`cffi`: https://cffi.readthedocs.io/

@@ -10,16 +10,9 @@ INCLUDES = """
 
 TYPES = """
 typedef ... EVP_CIPHER;
-typedef struct {
-    const EVP_CIPHER *cipher;
-    ENGINE *engine;
-    int encrypt;
-    ...;
-} EVP_CIPHER_CTX;
+typedef ... EVP_CIPHER_CTX;
 typedef ... EVP_MD;
-typedef struct env_md_ctx_st {
-    ...;
-} EVP_MD_CTX;
+typedef struct { ...; } EVP_MD_CTX;
 
 typedef ... EVP_PKEY;
 typedef ... EVP_PKEY_CTX;
@@ -55,20 +48,21 @@ int EVP_CipherInit_ex(EVP_CIPHER_CTX *, const EVP_CIPHER *, ENGINE *,
 int EVP_CipherUpdate(EVP_CIPHER_CTX *, unsigned char *, int *,
                      const unsigned char *, int);
 int EVP_CipherFinal_ex(EVP_CIPHER_CTX *, unsigned char *, int *);
+int EVP_CIPHER_block_size(const EVP_CIPHER *);
 int EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *);
-void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *);
 EVP_CIPHER_CTX *EVP_CIPHER_CTX_new(void);
 void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *);
 int EVP_CIPHER_CTX_set_key_length(EVP_CIPHER_CTX *, int);
+const EVP_CIPHER *EVP_CIPHER_CTX_cipher(const EVP_CIPHER_CTX *);
 
-EVP_MD_CTX *EVP_MD_CTX_create(void);
 int EVP_MD_CTX_copy_ex(EVP_MD_CTX *, const EVP_MD_CTX *);
 int EVP_DigestInit_ex(EVP_MD_CTX *, const EVP_MD *, ENGINE *);
 int EVP_DigestUpdate(EVP_MD_CTX *, const void *, size_t);
 int EVP_DigestFinal_ex(EVP_MD_CTX *, unsigned char *, unsigned int *);
 int EVP_MD_CTX_cleanup(EVP_MD_CTX *);
-void EVP_MD_CTX_destroy(EVP_MD_CTX *);
 const EVP_MD *EVP_get_digestbyname(const char *);
+const EVP_MD *EVP_MD_CTX_md(const EVP_MD_CTX *);
+int EVP_MD_size(const EVP_MD *);
 
 EVP_PKEY *EVP_PKEY_new(void);
 void EVP_PKEY_free(EVP_PKEY *);
@@ -78,6 +72,11 @@ int EVP_PKEY_size(EVP_PKEY *);
 RSA *EVP_PKEY_get1_RSA(EVP_PKEY *);
 DSA *EVP_PKEY_get1_DSA(EVP_PKEY *);
 DH *EVP_PKEY_get1_DH(EVP_PKEY *);
+
+int EVP_PKEY_encrypt(EVP_PKEY_CTX *, unsigned char *, size_t *,
+                     const unsigned char *, size_t);
+int EVP_PKEY_decrypt(EVP_PKEY_CTX *, unsigned char *, size_t *,
+                     const unsigned char *, size_t);
 
 int EVP_SignInit(EVP_MD_CTX *, const EVP_MD *);
 int EVP_SignUpdate(EVP_MD_CTX *, const void *, size_t);
@@ -99,8 +98,21 @@ const EVP_MD *EVP_sha512(void);
 int PKCS5_PBKDF2_HMAC_SHA1(const char *, int, const unsigned char *, int, int,
                            int, unsigned char *);
 
-int EVP_PKEY_set1_RSA(EVP_PKEY *, struct rsa_st *);
-int EVP_PKEY_set1_DSA(EVP_PKEY *, struct dsa_st *);
+EVP_PKEY_CTX *EVP_PKEY_CTX_new(EVP_PKEY *, ENGINE *);
+EVP_PKEY_CTX *EVP_PKEY_CTX_new_id(int, ENGINE *);
+EVP_PKEY_CTX *EVP_PKEY_CTX_dup(EVP_PKEY_CTX *);
+void EVP_PKEY_CTX_free(EVP_PKEY_CTX *);
+int EVP_PKEY_sign_init(EVP_PKEY_CTX *);
+int EVP_PKEY_sign(EVP_PKEY_CTX *, unsigned char *, size_t *,
+                  const unsigned char *, size_t);
+int EVP_PKEY_verify_init(EVP_PKEY_CTX *);
+int EVP_PKEY_verify(EVP_PKEY_CTX *, const unsigned char *, size_t,
+                    const unsigned char *, size_t);
+int EVP_PKEY_encrypt_init(EVP_PKEY_CTX *);
+int EVP_PKEY_decrypt_init(EVP_PKEY_CTX *);
+
+int EVP_PKEY_set1_RSA(EVP_PKEY *, RSA *);
+int EVP_PKEY_set1_DSA(EVP_PKEY *, DSA *);
 int EVP_PKEY_set1_DH(EVP_PKEY *, DH *);
 
 int EVP_PKEY_get_attr_count(const EVP_PKEY *);
@@ -120,10 +132,20 @@ int EVP_PKEY_cmp(const EVP_PKEY *, const EVP_PKEY *);
 
 EVP_PKEY *EVP_PKCS82PKEY(PKCS8_PRIV_KEY_INFO *);
 
+int EVP_PKEY_id(const EVP_PKEY *);
 int Cryptography_EVP_PKEY_id(const EVP_PKEY *);
+
+/* in 1.1.0 _create and _destroy were renamed to _new and _free. The following
+   two functions wrap both the old and new functions so we can call them
+   without worrying about what OpenSSL we're running against. */
+EVP_MD_CTX *Cryptography_EVP_MD_CTX_new(void);
+void Cryptography_EVP_MD_CTX_free(EVP_MD_CTX *);
 """
 
 MACROS = """
+/* became a macro in 1.1.0 */
+void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *);
+
 void OpenSSL_add_all_algorithms(void);
 int EVP_PKEY_assign_RSA(EVP_PKEY *, RSA *);
 int EVP_PKEY_assign_DSA(EVP_PKEY *, DSA *);
@@ -140,40 +162,9 @@ int PKCS5_PBKDF2_HMAC(const char *, int, const unsigned char *, int, int,
 
 int EVP_PKEY_CTX_set_signature_md(EVP_PKEY_CTX *, const EVP_MD *);
 
-/* These aren't macros, but must be in this section because they're not
-   available in 0.9.8. */
-EVP_PKEY_CTX *EVP_PKEY_CTX_new(EVP_PKEY *, ENGINE *);
-EVP_PKEY_CTX *EVP_PKEY_CTX_new_id(int, ENGINE *);
-EVP_PKEY_CTX *EVP_PKEY_CTX_dup(EVP_PKEY_CTX *);
-void EVP_PKEY_CTX_free(EVP_PKEY_CTX *);
-int EVP_PKEY_sign_init(EVP_PKEY_CTX *);
-int EVP_PKEY_sign(EVP_PKEY_CTX *, unsigned char *, size_t *,
-                  const unsigned char *, size_t);
-int EVP_PKEY_verify_init(EVP_PKEY_CTX *);
-int EVP_PKEY_verify(EVP_PKEY_CTX *, const unsigned char *, size_t,
-                    const unsigned char *, size_t);
-int EVP_PKEY_encrypt_init(EVP_PKEY_CTX *);
-int EVP_PKEY_decrypt_init(EVP_PKEY_CTX *);
-int EVP_PKEY_id(const EVP_PKEY *);
-
 int EVP_PKEY_derive_init(EVP_PKEY_CTX *ctx);
 int EVP_PKEY_derive_set_peer(EVP_PKEY_CTX *ctx, EVP_PKEY *peer);
 int EVP_PKEY_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen);
-
-/* The following were macros in 0.9.8e. Once we drop support for RHEL/CentOS 5
-   we should move these back to FUNCTIONS. */
-const EVP_CIPHER *EVP_CIPHER_CTX_cipher(const EVP_CIPHER_CTX *);
-int EVP_CIPHER_block_size(const EVP_CIPHER *);
-const EVP_MD *EVP_MD_CTX_md(const EVP_MD_CTX *);
-int EVP_MD_size(const EVP_MD *);
-
-/* Must be in macros because EVP_PKEY_CTX is undefined in 0.9.8 */
-int Cryptography_EVP_PKEY_encrypt(EVP_PKEY_CTX *ctx, unsigned char *out,
-                                  size_t *outlen, const unsigned char *in,
-                                  size_t inlen);
-int Cryptography_EVP_PKEY_decrypt(EVP_PKEY_CTX *ctx, unsigned char *out,
-                                  size_t *outlen, const unsigned char *in,
-                                  size_t inlen);
 """
 
 CUSTOMIZATIONS = """
@@ -185,61 +176,32 @@ const long EVP_CTRL_GCM_GET_TAG = -1;
 const long EVP_CTRL_GCM_SET_TAG = -1;
 const long EVP_CTRL_GCM_SET_IVLEN = -1;
 #endif
-#if OPENSSL_VERSION_NUMBER >= 0x10000000L
+
 const long Cryptography_HAS_PBKDF2_HMAC = 1;
 const long Cryptography_HAS_PKEY_CTX = 1;
 
-/* OpenSSL 0.9.8 defines EVP_PKEY_encrypt and EVP_PKEY_decrypt functions,
-   but they are a completely different signature from the ones in 1.0.0+.
-   These wrapper functions allows us to safely declare them on any version and
-   conditionally remove them on 0.9.8. */
-int Cryptography_EVP_PKEY_encrypt(EVP_PKEY_CTX *ctx, unsigned char *out,
-                                  size_t *outlen, const unsigned char *in,
-                                  size_t inlen) {
-    return EVP_PKEY_encrypt(ctx, out, outlen, in, inlen);
-}
-int Cryptography_EVP_PKEY_decrypt(EVP_PKEY_CTX *ctx, unsigned char *out,
-                                  size_t *outlen, const unsigned char *in,
-                                  size_t inlen) {
-    return EVP_PKEY_decrypt(ctx, out, outlen, in, inlen);
-}
-#else
-const long Cryptography_HAS_PBKDF2_HMAC = 0;
-int (*PKCS5_PBKDF2_HMAC)(const char *, int, const unsigned char *, int, int,
-                         const EVP_MD *, int, unsigned char *) = NULL;
-const long Cryptography_HAS_PKEY_CTX = 0;
-typedef void EVP_PKEY_CTX;
-int (*EVP_PKEY_CTX_set_signature_md)(EVP_PKEY_CTX *, const EVP_MD *) = NULL;
-int (*EVP_PKEY_sign_init)(EVP_PKEY_CTX *) = NULL;
-int (*EVP_PKEY_sign)(EVP_PKEY_CTX *, unsigned char *, size_t *,
-                     const unsigned char *, size_t) = NULL;
-int (*EVP_PKEY_verify_init)(EVP_PKEY_CTX *) = NULL;
-int (*EVP_PKEY_verify)(EVP_PKEY_CTX *, const unsigned char *, size_t,
-                       const unsigned char *, size_t) = NULL;
-EVP_PKEY_CTX *(*EVP_PKEY_CTX_new)(EVP_PKEY *, ENGINE *) = NULL;
-EVP_PKEY_CTX *(*EVP_PKEY_CTX_new_id)(int, ENGINE *) = NULL;
-EVP_PKEY_CTX *(*EVP_PKEY_CTX_dup)(EVP_PKEY_CTX *) = NULL;
-void (*EVP_PKEY_CTX_free)(EVP_PKEY_CTX *) = NULL;
-int (*EVP_PKEY_encrypt_init)(EVP_PKEY_CTX *) = NULL;
-int (*EVP_PKEY_decrypt_init)(EVP_PKEY_CTX *) = NULL;
-int (*Cryptography_EVP_PKEY_encrypt)(EVP_PKEY_CTX *, unsigned char *, size_t *,
-                                     const unsigned char *, size_t) = NULL;
-int (*Cryptography_EVP_PKEY_decrypt)(EVP_PKEY_CTX *, unsigned char *, size_t *,
-                                     const unsigned char *, size_t) = NULL;
-int (*EVP_PKEY_id)(const EVP_PKEY *) = NULL;
-#endif
 #ifdef OPENSSL_NO_EC
 int (*EVP_PKEY_assign_EC_KEY)(EVP_PKEY *, EC_KEY *) = NULL;
 EC_KEY *(*EVP_PKEY_get1_EC_KEY)(EVP_PKEY *) = NULL;
 int (*EVP_PKEY_set1_EC_KEY)(EVP_PKEY *, EC_KEY *) = NULL;
 #endif
-/* EVP_PKEY_id is not available on 0.9.8 so we'll define our own. This can
-   be removed when we remove 0.9.8 support. */
+
 int Cryptography_EVP_PKEY_id(const EVP_PKEY *key) {
-    #if OPENSSL_VERSION_NUMBER >= 0x10000000L
-        return EVP_PKEY_id(key);
-    #else
-        return key->type;
-    #endif
+    return EVP_PKEY_id(key);
+}
+
+EVP_MD_CTX *Cryptography_EVP_MD_CTX_new(void) {
+#if CRYPTOGRAPHY_OPENSSL_LESS_THAN_110 || defined(LIBRESSL_VERSION_NUMBER)
+    return EVP_MD_CTX_create();
+#else
+    return EVP_MD_CTX_new();
+#endif
+}
+void Cryptography_EVP_MD_CTX_free(EVP_MD_CTX *ctx) {
+#if CRYPTOGRAPHY_OPENSSL_LESS_THAN_110 || defined(LIBRESSL_VERSION_NUMBER)
+    EVP_MD_CTX_destroy(ctx);
+#else
+    EVP_MD_CTX_free(ctx);
+#endif
 }
 """

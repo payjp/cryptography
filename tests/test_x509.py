@@ -8,6 +8,7 @@ import binascii
 import datetime
 import ipaddress
 import os
+import warnings
 
 from pyasn1.codec.der import decoder
 
@@ -486,10 +487,34 @@ class TestRSACertificate(object):
             backend
         )
         assert isinstance(cert, x509.Certificate)
-        assert cert.serial == 11559813051657483483
+        assert cert.serial_number == 11559813051657483483
         fingerprint = binascii.hexlify(cert.fingerprint(hashes.SHA1()))
         assert fingerprint == b"2b619ed04bfc9c3b08eb677d272192286a0947a8"
         assert isinstance(cert.signature_hash_algorithm, hashes.SHA1)
+
+    def test_cert_serial_number(self, backend):
+        cert = _load_cert(
+            os.path.join("x509", "PKITS_data", "certs", "GoodCACert.crt"),
+            x509.load_der_x509_certificate,
+            backend
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("always", utils.DeprecatedIn10)
+            assert cert.serial == 2
+            assert cert.serial_number == 2
+
+    def test_cert_serial_warning(self, backend):
+        cert = _load_cert(
+            os.path.join("x509", "PKITS_data", "certs", "GoodCACert.crt"),
+            x509.load_der_x509_certificate,
+            backend
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("always", utils.DeprecatedIn10)
+            with pytest.deprecated_call():
+                cert.serial
 
     def test_load_der_cert(self, backend):
         cert = _load_cert(
@@ -498,7 +523,7 @@ class TestRSACertificate(object):
             backend
         )
         assert isinstance(cert, x509.Certificate)
-        assert cert.serial == 2
+        assert cert.serial_number == 2
         fingerprint = binascii.hexlify(cert.fingerprint(hashes.SHA1()))
         assert fingerprint == b"6f49779533d565e8b7c1062503eab41492c38e4d"
         assert isinstance(cert.signature_hash_algorithm, hashes.SHA256)
@@ -734,7 +759,7 @@ class TestRSACertificate(object):
 
         assert cert.not_valid_before == datetime.datetime(2010, 1, 1, 8, 30)
         assert cert.not_valid_after == datetime.datetime(2030, 12, 31, 8, 30)
-        assert cert.serial == 2
+        assert cert.serial_number == 2
         public_key = cert.public_key()
         assert isinstance(public_key, rsa.RSAPublicKey)
         assert cert.version is x509.Version.v3
@@ -909,7 +934,7 @@ class TestRSACertificate(object):
         # We should recover what we had to start with.
         assert cert.not_valid_before == datetime.datetime(2010, 1, 1, 8, 30)
         assert cert.not_valid_after == datetime.datetime(2030, 12, 31, 8, 30)
-        assert cert.serial == 2
+        assert cert.serial_number == 2
         public_key = cert.public_key()
         assert isinstance(public_key, rsa.RSAPublicKey)
         assert cert.version is x509.Version.v3
@@ -932,7 +957,7 @@ class TestRSACertificate(object):
         # We should recover what we had to start with.
         assert cert.not_valid_before == datetime.datetime(2010, 1, 1, 8, 30)
         assert cert.not_valid_after == datetime.datetime(2030, 12, 31, 8, 30)
-        assert cert.serial == 2
+        assert cert.serial_number == 2
         public_key = cert.public_key()
         assert isinstance(public_key, rsa.RSAPublicKey)
         assert cert.version is x509.Version.v3
@@ -1240,6 +1265,22 @@ class TestRSACertificateRequest(object):
 
         with pytest.raises(TypeError):
             request.public_bytes('NotAnEncoding')
+
+    def test_signature_invalid(self, backend):
+        request = _load_cert(
+            os.path.join("x509", "requests", "invalid_signature.pem"),
+            x509.load_pem_x509_csr,
+            backend
+        )
+        assert not request.is_signature_valid
+
+    def test_signature_valid(self, backend):
+        request = _load_cert(
+            os.path.join("x509", "requests", "rsa_sha256.pem"),
+            x509.load_pem_x509_csr,
+            backend
+        )
+        assert request.is_signature_valid
 
     @pytest.mark.parametrize(
         ("request_path", "loader_func", "encoding"),
@@ -1894,7 +1935,7 @@ class TestCertificateBuilder(object):
     @pytest.mark.requires_backend_interface(interface=DSABackend)
     @pytest.mark.requires_backend_interface(interface=X509Backend)
     def test_build_cert_with_dsa_private_key(self, backend):
-        if backend._lib.OPENSSL_VERSION_NUMBER < 0x10001000:
+        if backend._lib.CRYPTOGRAPHY_OPENSSL_LESS_THAN_101:
             pytest.skip("Requires a newer OpenSSL. Must be >= 1.0.1")
 
         issuer_private_key = DSA_KEY_2048.private_key(backend)
@@ -1942,7 +1983,7 @@ class TestCertificateBuilder(object):
     @pytest.mark.requires_backend_interface(interface=EllipticCurveBackend)
     @pytest.mark.requires_backend_interface(interface=X509Backend)
     def test_build_cert_with_ec_private_key(self, backend):
-        if backend._lib.OPENSSL_VERSION_NUMBER < 0x10001000:
+        if backend._lib.CRYPTOGRAPHY_OPENSSL_LESS_THAN_101:
             pytest.skip("Requires a newer OpenSSL. Must be >= 1.0.1")
 
         _skip_curve_unsupported(backend, ec.SECP256R1())
@@ -2209,6 +2250,54 @@ class TestCertificateBuilder(object):
         )
         assert ext.value == x509.InhibitAnyPolicy(3)
 
+    @pytest.mark.parametrize(
+        "pc",
+        [
+            x509.PolicyConstraints(
+                require_explicit_policy=None,
+                inhibit_policy_mapping=1
+            ),
+            x509.PolicyConstraints(
+                require_explicit_policy=3,
+                inhibit_policy_mapping=1
+            ),
+            x509.PolicyConstraints(
+                require_explicit_policy=0,
+                inhibit_policy_mapping=None
+            ),
+        ]
+    )
+    @pytest.mark.requires_backend_interface(interface=RSABackend)
+    @pytest.mark.requires_backend_interface(interface=X509Backend)
+    def test_policy_constraints(self, backend, pc):
+        issuer_private_key = RSA_KEY_2048.private_key(backend)
+        subject_private_key = RSA_KEY_2048.private_key(backend)
+
+        not_valid_before = datetime.datetime(2002, 1, 1, 12, 1)
+        not_valid_after = datetime.datetime(2030, 12, 31, 8, 30)
+
+        cert = x509.CertificateBuilder().subject_name(
+            x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME, u'US')])
+        ).issuer_name(
+            x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME, u'US')])
+        ).not_valid_before(
+            not_valid_before
+        ).not_valid_after(
+            not_valid_after
+        ).public_key(
+            subject_private_key.public_key()
+        ).serial_number(
+            123
+        ).add_extension(
+            pc, critical=False
+        ).sign(issuer_private_key, hashes.SHA256(), backend)
+
+        ext = cert.extensions.get_extension_for_class(
+            x509.PolicyConstraints
+        )
+        assert ext.critical is False
+        assert ext.value == pc
+
     @pytest.mark.requires_backend_interface(interface=RSABackend)
     @pytest.mark.requires_backend_interface(interface=X509Backend)
     def test_name_constraints(self, backend):
@@ -2318,6 +2407,39 @@ class TestCertificateBuilder(object):
         )
         assert basic_constraints.value.path_length is None
 
+    @pytest.mark.parametrize(
+        "unrecognized", [
+            x509.UnrecognizedExtension(
+                x509.ObjectIdentifier("1.2.3.4.5"),
+                b"abcdef",
+            )
+        ]
+    )
+    @pytest.mark.requires_backend_interface(interface=RSABackend)
+    @pytest.mark.requires_backend_interface(interface=X509Backend)
+    def test_unrecognized_extension(self, backend, unrecognized):
+        private_key = RSA_KEY_2048.private_key(backend)
+
+        cert = x509.CertificateBuilder().subject_name(
+            x509.Name([x509.NameAttribute(x509.OID_COUNTRY_NAME, u'US')])
+        ).issuer_name(
+            x509.Name([x509.NameAttribute(x509.OID_COUNTRY_NAME, u'US')])
+        ).not_valid_before(
+            datetime.datetime(2002, 1, 1, 12, 1)
+        ).not_valid_after(
+            datetime.datetime(2030, 12, 31, 8, 30)
+        ).public_key(
+            private_key.public_key()
+        ).serial_number(
+            123
+        ).add_extension(
+            unrecognized, critical=False
+        ).sign(private_key, hashes.SHA256(), backend)
+
+        ext = cert.extensions.get_extension_for_oid(unrecognized.oid)
+
+        assert ext.value == unrecognized
+
 
 @pytest.mark.requires_backend_interface(interface=X509Backend)
 class TestCertificateSigningRequestBuilder(object):
@@ -2415,7 +2537,7 @@ class TestCertificateSigningRequestBuilder(object):
 
     @pytest.mark.requires_backend_interface(interface=EllipticCurveBackend)
     def test_build_ca_request_with_ec(self, backend):
-        if backend._lib.OPENSSL_VERSION_NUMBER < 0x10001000:
+        if backend._lib.CRYPTOGRAPHY_OPENSSL_LESS_THAN_101:
             pytest.skip("Requires a newer OpenSSL. Must be >= 1.0.1")
 
         _skip_curve_unsupported(backend, ec.SECP256R1())
@@ -2445,7 +2567,7 @@ class TestCertificateSigningRequestBuilder(object):
 
     @pytest.mark.requires_backend_interface(interface=DSABackend)
     def test_build_ca_request_with_dsa(self, backend):
-        if backend._lib.OPENSSL_VERSION_NUMBER < 0x10001000:
+        if backend._lib.CRYPTOGRAPHY_OPENSSL_LESS_THAN_101:
             pytest.skip("Requires a newer OpenSSL. Must be >= 1.0.1")
 
         private_key = DSA_KEY_2048.private_key(backend)
@@ -3325,6 +3447,20 @@ class TestNameAttribute(object):
             x509.NameAttribute(
                 x509.ObjectIdentifier('2.999.1'),
                 b'bytes'
+            )
+
+    def test_init_bad_country_code_value(self):
+        with pytest.raises(ValueError):
+            x509.NameAttribute(
+                NameOID.COUNTRY_NAME,
+                u'United States'
+            )
+
+        # unicode string of length 2, but > 2 bytes
+        with pytest.raises(ValueError):
+            x509.NameAttribute(
+                NameOID.COUNTRY_NAME,
+                u'\U0001F37A\U0001F37A'
             )
 
     def test_eq(self):

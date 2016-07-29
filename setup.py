@@ -58,7 +58,7 @@ else:
     setup_requirements.append("cffi>=1.4.1")
 
 test_requirements = [
-    "pytest",
+    "pytest>=2.9.0",
     "pretend",
     "iso8601",
     "pyasn1_modules",
@@ -302,16 +302,14 @@ setup(
     ],
 
     package_dir={"": "src"},
-    packages=find_packages(
-        where="src", exclude=["_cffi_src", "_cffi_src.*", "tests", "tests.*"]
-    ),
+    packages=find_packages(where="src", exclude=["_cffi_src", "_cffi_src.*"]),
     include_package_data=True,
 
     install_requires=requirements,
     tests_require=test_requirements,
     extras_require={
         "test": test_requirements,
-        "docs-test": [
+        "docstest": [
             "doc8",
             "pyenchant",
             "readme_renderer",
@@ -319,7 +317,7 @@ setup(
             "sphinx_rtd_theme",
             "sphinxcontrib-spelling",
         ],
-        "pep8-test": [
+        "pep8test": [
             "flake8",
             "flake8-import-order",
             "pep8-naming",

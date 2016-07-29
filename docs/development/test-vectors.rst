@@ -44,6 +44,7 @@ Custom asymmetric vectors
     :maxdepth: 1
 
     custom-vectors/secp256k1
+    custom-vectors/rsa-oaep-sha2
 
 * ``asymmetric/PEM_Serialization/ec_private_key.pem`` and
   ``asymmetric/DER_Serialization/ec_private_key.der`` - Contains an Elliptic
@@ -113,6 +114,9 @@ X.509
 * ``department-of-state-root.pem`` - The intermediary CA for the Department of
   State, issued by the United States Federal Government's Common Policy CA.
   Notably has a ``critical`` policy constraints extensions.
+* ``e-trust.ru.der`` - A certificate from a `Russian CA`_ signed using the GOST
+  cipher and containing numerous unusual encodings such as NUMERICSTRING in
+  the subject DN.
 
 Custom X.509 Vectors
 ~~~~~~~~~~~~~~~~~~~~
@@ -283,7 +287,7 @@ Custom X.509 Request Vectors
   request using RSA and SHA1 with a subject alternative name extension
   generated using OpenSSL.
 * ``two_basic_constraints.pem`` - A certificate signing request
-  for a RSA 2048 bit key containing two basic constraints extensions.
+  for an RSA 2048 bit key containing two basic constraints extensions.
 * ``unsupported_extension.pem`` - A certificate signing request
   for an RSA 2048 bit key containing containing an unsupported
   extension type. The OID was encoded as "1.2.3.4" with an
@@ -292,9 +296,11 @@ Custom X.509 Request Vectors
   request for an RSA 2048 bit key containing containing an unsupported
   extension type marked critical. The OID was encoded as "1.2.3.4"
   with an ``extnValue`` of "value".
-* ``basic_constraints.pem`` - A certificate signing request for a RSA
+* ``basic_constraints.pem`` - A certificate signing request for an RSA
   2048 bit key containing a basic constraints extension marked as
   critical.
+* ``invalid_signature.pem`` - A certificate signing request for an RSA
+  1024 bit key containing an invalid signature with correct padding.
 
 Custom X.509 Certificate Revocation List Vectors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -326,6 +332,7 @@ Hashes
 * SHA1 from `NIST CAVP`_.
 * SHA2 (224, 256, 384, 512) from `NIST CAVP`_.
 * Whirlpool from the `Whirlpool website`_.
+* Blake2s and Blake2b from OpenSSL `test/evptests.txt`_.
 
 HMAC
 ~~~~
@@ -342,6 +349,8 @@ Key derivation functions
 * PBKDF2 (HMAC-SHA1) from :rfc:`6070`.
 * scrypt from the `draft RFC`_.
 * X9.63 KDF from `NIST CAVP`_.
+* SP 800-108 Counter Mode KDF (HMAC-SHA1, HMAC-SHA224, HMAC-SHA256,
+  HMAC-SHA384, HMAC-SHA512) from `NIST CAVP`_.
 
 Key wrapping
 ~~~~~~~~~~~~
@@ -423,7 +432,7 @@ header format (substituting the correct information):
 .. _`NIST CAVP`: http://csrc.nist.gov/groups/STM/cavp/
 .. _`Bruce Schneier's vectors`: https://www.schneier.com/code/vectors.txt
 .. _`Camellia page`: https://info.isl.ntt.co.jp/crypt/eng/camellia/
-.. _`CRYPTREC`: http://www.cryptrec.go.jp
+.. _`CRYPTREC`: https://www.cryptrec.go.jp
 .. _`OpenSSL's test vectors`: https://github.com/openssl/openssl/blob/97cf1f6c2854a3a955fd7dd3a1f113deba00c9ef/crypto/evp/evptests.txt#L232
 .. _`RIPEMD website`: http://homes.esat.kuleuven.be/~bosselae/ripemd160.html
 .. _`Whirlpool website`: http://www.larc.usp.br/~pbarreto/WhirlpoolPage.html
@@ -448,3 +457,5 @@ header format (substituting the correct information):
 .. _`root data`: https://hg.mozilla.org/projects/nss/file/25b2922cc564/security/nss/lib/ckfw/builtins/certdata.txt#l2053
 .. _`asymmetric/public/PKCS1/dsa.pub.pem`: https://github.com/ruby/ruby/blob/4ccb387f3bc436a08fc6d72c4931994f5de95110/test/openssl/test_pkey_dsa.rb#L53
 .. _`Mozilla bug`: https://bugzilla.mozilla.org/show_bug.cgi?id=233586
+.. _`Russian CA`: https://e-trust.gosuslugi.ru/MainCA
+.. _`test/evptests.txt`: https://github.com/openssl/openssl/blob/2d0b44126763f989a4cbffbffe9d0c7518158bb7/test/evptests.txt

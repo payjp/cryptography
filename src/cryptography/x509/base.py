@@ -63,7 +63,7 @@ class Certificate(object):
         """
 
     @abc.abstractproperty
-    def serial(self):
+    def serial_number(self):
         """
         Returns certificate serial number
         """
@@ -286,6 +286,12 @@ class CertificateSigningRequest(object):
         """
         Returns the PKCS#10 CertificationRequestInfo bytes as defined in RFC
         2986.
+        """
+
+    @abc.abstractproperty
+    def is_signature_valid(self):
+        """
+        Verifies signature of signing request.
         """
 
 
