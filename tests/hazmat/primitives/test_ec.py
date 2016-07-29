@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
 )
 
 from .fixtures_ec import EC_KEY_SECP384R1
+from ...doubles import DummyKeySerializationEncryption
 from ...utils import (
     load_fips_ecdsa_key_pair_vectors, load_fips_ecdsa_signing_vectors,
     load_kasvs_ecdh_vectors, load_vectors_from_file,
@@ -79,11 +80,6 @@ class DummyCurve(object):
 @utils.register_interface(ec.EllipticCurveSignatureAlgorithm)
 class DummySignatureAlgorithm(object):
     algorithm = None
-
-
-@utils.register_interface(serialization.KeySerializationEncryption)
-class DummyKeyEncryption(object):
-    pass
 
 
 @pytest.mark.requires_backend_interface(interface=EllipticCurveBackend)
@@ -225,6 +221,30 @@ def test_from_encoded_point_not_a_curve():
 def test_ec_public_numbers_repr():
     pn = ec.EllipticCurvePublicNumbers(2, 3, ec.SECP256R1())
     assert repr(pn) == "<EllipticCurvePublicNumbers(curve=secp256r1, x=2, y=3>"
+
+
+def test_ec_public_numbers_hash():
+    pn1 = ec.EllipticCurvePublicNumbers(2, 3, ec.SECP256R1())
+    pn2 = ec.EllipticCurvePublicNumbers(2, 3, ec.SECP256R1())
+    pn3 = ec.EllipticCurvePublicNumbers(1, 3, ec.SECP256R1())
+
+    assert hash(pn1) == hash(pn2)
+    assert hash(pn1) != hash(pn3)
+
+
+def test_ec_private_numbers_hash():
+    numbers1 = ec.EllipticCurvePrivateNumbers(
+        1, ec.EllipticCurvePublicNumbers(2, 3, DummyCurve())
+    )
+    numbers2 = ec.EllipticCurvePrivateNumbers(
+        1, ec.EllipticCurvePublicNumbers(2, 3, DummyCurve())
+    )
+    numbers3 = ec.EllipticCurvePrivateNumbers(
+        2, ec.EllipticCurvePublicNumbers(2, 3, DummyCurve())
+    )
+
+    assert hash(numbers1) == hash(numbers2)
+    assert hash(numbers1) != hash(numbers3)
 
 
 @pytest.mark.requires_backend_interface(interface=EllipticCurveBackend)
@@ -482,6 +502,28 @@ class TestECDSAVectors(object):
                 verifier.verify()
         else:
             verifier.verify()
+
+    def test_sign(self, backend):
+        _skip_curve_unsupported(backend, ec.SECP256R1())
+        message = b"one little message"
+        algorithm = ec.ECDSA(hashes.SHA1())
+        private_key = ec.generate_private_key(ec.SECP256R1(), backend)
+        signature = private_key.sign(message, algorithm)
+        public_key = private_key.public_key()
+        verifier = public_key.verifier(signature, algorithm)
+        verifier.update(message)
+        verifier.verify()
+
+    def test_verify(self, backend):
+        _skip_curve_unsupported(backend, ec.SECP256R1())
+        message = b"one little message"
+        algorithm = ec.ECDSA(hashes.SHA1())
+        private_key = ec.generate_private_key(ec.SECP256R1(), backend)
+        signer = private_key.signer(algorithm)
+        signer.update(message)
+        signature = signer.finalize()
+        public_key = private_key.public_key()
+        public_key.verify(signature, message, algorithm)
 
 
 class TestECNumbersEquality(object):
@@ -741,7 +783,7 @@ class TestECSerialization(object):
             key.private_bytes(
                 serialization.Encoding.PEM,
                 serialization.PrivateFormat.TraditionalOpenSSL,
-                DummyKeyEncryption()
+                DummyKeySerializationEncryption()
             )
 
     def test_public_bytes_from_derived_public_key(self, backend):
@@ -794,6 +836,34 @@ class TestEllipticCurvePEMPublicKeySerialization(object):
             encoding, serialization.PublicFormat.SubjectPublicKeyInfo,
         )
         assert serialized == key_bytes
+
+    def test_public_bytes_openssh(self, backend):
+        _skip_curve_unsupported(backend, ec.SECP192R1())
+        _skip_curve_unsupported(backend, ec.SECP256R1())
+
+        key_bytes = load_vectors_from_file(
+            os.path.join(
+                "asymmetric", "PEM_Serialization", "ec_public_key.pem"
+            ),
+            lambda pemfile: pemfile.read(), mode="rb"
+        )
+        key = serialization.load_pem_public_key(key_bytes, backend)
+
+        ssh_bytes = key.public_bytes(
+            serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH
+        )
+        assert ssh_bytes == (
+            b"ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAy"
+            b"NTYAAABBBCS8827s9rUZyxZTi/um01+oIlWrwLHOjQxRU9CDAndom00zVAw5BRrI"
+            b"KtHB+SWD4P+sVJTARSq1mHt8kOIWrPc="
+        )
+
+        key = ec.generate_private_key(ec.SECP192R1(), backend).public_key()
+        with pytest.raises(ValueError):
+            key.public_bytes(
+                serialization.Encoding.OpenSSH,
+                serialization.PublicFormat.OpenSSH
+            )
 
     def test_public_bytes_invalid_encoding(self, backend):
         _skip_curve_unsupported(backend, ec.SECP256R1())

@@ -240,6 +240,11 @@ class _EllipticCurvePrivateKey(object):
             self._ec_key
         )
 
+    def sign(self, data, signature_algorithm):
+        signer = self.signer(signature_algorithm)
+        signer.update(data)
+        return signer.finalize()
+
 
 @utils.register_interface(ec.EllipticCurvePublicKeyWithSerialization)
 class _EllipticCurvePublicKey(object):
@@ -299,6 +304,12 @@ class _EllipticCurvePublicKey(object):
         return self._backend._public_key_bytes(
             encoding,
             format,
+            self,
             self._evp_pkey,
             None
         )
+
+    def verify(self, signature, data, signature_algorithm):
+        verifier = self.verifier(signature, signature_algorithm)
+        verifier.update(data)
+        verifier.verify()

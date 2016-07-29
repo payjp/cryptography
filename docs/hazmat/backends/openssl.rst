@@ -3,9 +3,8 @@
 OpenSSL backend
 ===============
 
-The `OpenSSL`_ C library. Cryptography supports version ``0.9.8e`` (present in
-Red Hat Enterprise Linux 5) and greater. Earlier versions may work but are
-**not tested or supported**.
+The `OpenSSL`_ C library. Cryptography supports OpenSSL version ``1.0.0`` and
+greater.
 
 .. data:: cryptography.hazmat.backends.openssl.backend
 
@@ -43,7 +42,7 @@ Red Hat Enterprise Linux 5) and greater. Earlier versions may work but are
 OS random engine
 ----------------
 
-OpenSSL uses a user-space CSPRNG that is seeded from system random (
+By default OpenSSL uses a user-space CSPRNG that is seeded from system random (
 ``/dev/urandom`` or ``CryptGenRandom``). This CSPRNG is not reseeded
 automatically when a process calls ``fork()``. This can result in situations
 where two different processes can return similar or identical keys and

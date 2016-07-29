@@ -9,7 +9,6 @@ import os
 
 import pytest
 
-from cryptography import utils
 from cryptography.exceptions import AlreadyFinalized, InvalidSignature
 from cryptography.hazmat.backends.interfaces import (
     DSABackend, PEMSerializationBackend
@@ -24,22 +23,11 @@ from cryptography.utils import bit_length
 from .fixtures_dsa import (
     DSA_KEY_1024, DSA_KEY_2048, DSA_KEY_3072
 )
+from ...doubles import DummyHashAlgorithm, DummyKeySerializationEncryption
 from ...utils import (
     load_fips_dsa_key_pair_vectors, load_fips_dsa_sig_vectors,
     load_vectors_from_file,
 )
-
-
-@utils.register_interface(serialization.KeySerializationEncryption)
-class DummyKeyEncryption(object):
-    pass
-
-
-@utils.register_interface(hashes.HashAlgorithm)
-class DummyHashAlgorithm(object):
-    name = "dummy"
-    digest_size = 32
-    block_size = 64
 
 
 def _skip_if_dsa_not_supported(backend, algorithm, p, q, g):
@@ -618,6 +606,16 @@ class TestDSAVerification(object):
         with pytest.raises(AlreadyFinalized):
             verifier.update(b"more data")
 
+    def test_verify(self, backend):
+        message = b"one little message"
+        algorithm = hashes.SHA1()
+        private_key = DSA_KEY_1024.private_key(backend)
+        signer = private_key.signer(algorithm)
+        signer.update(message)
+        signature = signer.finalize()
+        public_key = private_key.public_key()
+        public_key.verify(signature, message, algorithm)
+
 
 @pytest.mark.requires_backend_interface(interface=DSABackend)
 class TestDSASignature(object):
@@ -672,6 +670,16 @@ class TestDSASignature(object):
             signer.finalize()
         with pytest.raises(AlreadyFinalized):
             signer.update(b"more data")
+
+    def test_sign(self, backend):
+        private_key = DSA_KEY_1024.private_key(backend)
+        message = b"one little message"
+        algorithm = hashes.SHA1()
+        signature = private_key.sign(message, algorithm)
+        public_key = private_key.public_key()
+        verifier = public_key.verifier(signature, algorithm)
+        verifier.update(message)
+        verifier.verify()
 
 
 class TestDSANumbers(object):
@@ -732,6 +740,21 @@ class TestDSANumbers(object):
 
         with pytest.raises(TypeError):
             dsa.DSAPrivateNumbers(x=None, public_numbers=public_numbers)
+
+    def test_repr(self):
+        parameter_numbers = dsa.DSAParameterNumbers(p=1, q=2, g=3)
+        assert (
+            repr(parameter_numbers) == "<DSAParameterNumbers(p=1, q=2, g=3)>"
+        )
+
+        public_numbers = dsa.DSAPublicNumbers(
+            y=4,
+            parameter_numbers=parameter_numbers
+        )
+        assert repr(public_numbers) == (
+            "<DSAPublicNumbers(y=4, parameter_numbers=<DSAParameterNumbers(p=1"
+            ", q=2, g=3)>)>"
+        )
 
 
 class TestDSANumberEquality(object):
@@ -994,7 +1017,7 @@ class TestDSASerialization(object):
             key.private_bytes(
                 serialization.Encoding.PEM,
                 serialization.PrivateFormat.TraditionalOpenSSL,
-                DummyKeyEncryption()
+                DummyKeySerializationEncryption()
             )
 
 
@@ -1029,6 +1052,29 @@ class TestDSAPEMPublicKeySerialization(object):
             encoding, serialization.PublicFormat.SubjectPublicKeyInfo,
         )
         assert serialized == key_bytes
+
+    def test_public_bytes_openssh(self, backend):
+        key_bytes = load_vectors_from_file(
+            os.path.join("asymmetric", "PKCS8", "unenc-dsa-pkcs8.pub.pem"),
+            lambda pemfile: pemfile.read(), mode="rb"
+        )
+        key = serialization.load_pem_public_key(key_bytes, backend)
+
+        ssh_bytes = key.public_bytes(
+            serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH
+        )
+        assert ssh_bytes == (
+            b"ssh-dss AAAAB3NzaC1kc3MAAACBAKoJMMwUWCUiHK/6KKwolBlqJ4M95ewhJweR"
+            b"aJQgd3Si57I4sNNvGySZosJYUIPrAUMpJEGNhn+qIS3RBx1NzrJ4J5StOTzAik1K"
+            b"2n9o1ug5pfzTS05ALYLLioy0D+wxkRv5vTYLA0yqy0xelHmSVzyekAmcGw8FlAyr"
+            b"5dLeSaFnAAAAFQCtwOhps28KwBOmgf301ImdaYIEUQAAAIEAjGtFia+lOk0QSL/D"
+            b"RtHzhsp1UhzPct2qJRKGiA7hMgH/SIkLv8M9ebrK7HHnp3hQe9XxpmQi45QVvgPn"
+            b"EUG6Mk9bkxMZKRgsiKn6QGKDYGbOvnS1xmkMfRARBsJAq369VOTjMB/Qhs5q2ski"
+            b"+ycTorCIfLoTubxozlz/8kHNMkYAAACAKyYOqX3GoSrpMsZA5989j/BKigWgMk+N"
+            b"Xxsj8V+hcP8/QgYRJO/yWGyxG0moLc3BuQ/GqE+xAQnLZ9tdLalxrq8Xvl43KEVj"
+            b"5MZNnl/ISAJYsxnw3inVTYNQcNnih5FNd9+BSR9EI7YtqYTrP0XrKin86l2uUlrG"
+            b"q2vM4Ev99bY="
+        )
 
     def test_public_bytes_invalid_encoding(self, backend):
         key = DSA_KEY_2048.private_key(backend).public_key()

@@ -6,7 +6,10 @@ from __future__ import absolute_import, division, print_function
 
 import pytest
 
-from cryptography.hazmat.bindings.openssl.binding import Binding
+from cryptography.exceptions import InternalError
+from cryptography.hazmat.bindings.openssl.binding import (
+    Binding, _OpenSSLErrorWithText, _openssl_assert
+)
 
 
 class TestOpenSSL(object):
@@ -134,18 +137,32 @@ class TestOpenSSL(object):
 
     def test_conditional_removal(self):
         b = Binding()
-        if b.lib.OPENSSL_VERSION_NUMBER >= 0x10000000:
-            assert b.lib.X509_V_ERR_DIFFERENT_CRL_SCOPE
-            assert b.lib.X509_V_ERR_CRL_PATH_VALIDATION_ERROR
-        else:
-            with pytest.raises(AttributeError):
-                b.lib.X509_V_ERR_DIFFERENT_CRL_SCOPE
 
-            with pytest.raises(AttributeError):
-                b.lib.X509_V_ERR_CRL_PATH_VALIDATION_ERROR
-
-        if b.lib.OPENSSL_VERSION_NUMBER >= 0x10001000:
+        if b.lib.CRYPTOGRAPHY_OPENSSL_101_OR_GREATER:
             assert b.lib.CMAC_Init
         else:
             with pytest.raises(AttributeError):
                 b.lib.CMAC_Init
+
+    def test_openssl_assert_error_on_stack(self):
+        b = Binding()
+        b.lib.ERR_put_error(
+            b.lib.ERR_LIB_EVP,
+            b.lib.EVP_F_EVP_ENCRYPTFINAL_EX,
+            b.lib.EVP_R_DATA_NOT_MULTIPLE_OF_BLOCK_LENGTH,
+            b"",
+            -1
+        )
+        with pytest.raises(InternalError) as exc_info:
+            _openssl_assert(b.lib, False)
+
+        assert exc_info.value.err_code == [_OpenSSLErrorWithText(
+            code=101183626,
+            lib=b.lib.ERR_LIB_EVP,
+            func=b.lib.EVP_F_EVP_ENCRYPTFINAL_EX,
+            reason=b.lib.EVP_R_DATA_NOT_MULTIPLE_OF_BLOCK_LENGTH,
+            reason_text=(
+                b'error:0607F08A:digital envelope routines:EVP_EncryptFinal_'
+                b'ex:data not multiple of block length'
+            )
+        )]

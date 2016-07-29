@@ -76,8 +76,8 @@ int EC_KEY_get_flags(const EC_KEY *);
 void EC_KEY_set_flags(EC_KEY *, int);
 void EC_KEY_clear_flags(EC_KEY *, int);
 EC_KEY *EC_KEY_new_by_curve_name(int);
-EC_KEY *EC_KEY_copy(EC_KEY *, const EC_KEY *);
-EC_KEY *EC_KEY_dup(const EC_KEY *);
+EC_KEY *EC_KEY_copy(EC_KEY *, EC_KEY *);
+EC_KEY *EC_KEY_dup(EC_KEY *);
 int EC_KEY_up_ref(EC_KEY *);
 const EC_GROUP *EC_KEY_get0_group(const EC_KEY *);
 int EC_GROUP_get_order(const EC_GROUP *, BIGNUM *, BN_CTX *);
@@ -90,19 +90,6 @@ unsigned int EC_KEY_get_enc_flags(const EC_KEY *);
 void EC_KEY_set_enc_flags(EC_KEY *eckey, unsigned int);
 point_conversion_form_t EC_KEY_get_conv_form(const EC_KEY *);
 void EC_KEY_set_conv_form(EC_KEY *, point_conversion_form_t);
-void *EC_KEY_get_key_method_data(
-    EC_KEY *,
-    void *(*)(void *),
-    void (*)(void *),
-    void (*)(void *)
-);
-void EC_KEY_insert_key_method_data(
-    EC_KEY *,
-    void *,
-    void *(*)(void *),
-    void (*)(void *),
-    void (*)(void *)
-);
 void EC_KEY_set_asn1_flag(EC_KEY *, int);
 int EC_KEY_precompute_mult(EC_KEY *, BN_CTX *);
 int EC_KEY_generate_key(EC_KEY *);
@@ -237,11 +224,6 @@ unsigned int (*EC_KEY_get_enc_flags)(const EC_KEY *) = NULL;
 void (*EC_KEY_set_enc_flags)(EC_KEY *eckey, unsigned int) = NULL;
 point_conversion_form_t (*EC_KEY_get_conv_form)(const EC_KEY *) = NULL;
 void (*EC_KEY_set_conv_form)(EC_KEY *, point_conversion_form_t) = NULL;
-void *(*EC_KEY_get_key_method_data)(
-    EC_KEY *, void *(*)(void *), void (*)(void *), void (*)(void *)) = NULL;
-void (*EC_KEY_insert_key_method_data)(
-    EC_KEY *, void *,
-    void *(*)(void *), void (*)(void *), void (*)(void *)) = NULL;
 void (*EC_KEY_set_asn1_flag)(EC_KEY *, int) = NULL;
 int (*EC_KEY_precompute_mult)(EC_KEY *, BN_CTX *) = NULL;
 int (*EC_KEY_generate_key)(EC_KEY *) = NULL;
@@ -349,7 +331,7 @@ int (*EC_METHOD_get_field_type)(const EC_METHOD *) = NULL;
 static const long Cryptography_HAS_EC = 1;
 #endif
 
-#if defined(OPENSSL_NO_EC) || OPENSSL_VERSION_NUMBER < 0x1000100f
+#if defined(OPENSSL_NO_EC) || CRYPTOGRAPHY_OPENSSL_LESS_THAN_101
 static const long Cryptography_HAS_EC_1_0_1 = 0;
 
 int (*EC_KEY_get_flags)(const EC_KEY *) = NULL;
@@ -389,7 +371,7 @@ EC_GROUP *(*EC_GROUP_new_curve_GF2m)(
 static const long Cryptography_HAS_EC2M = 1;
 #endif
 
-#if defined(OPENSSL_NO_EC) || OPENSSL_VERSION_NUMBER < 0x1000200f || \
+#if defined(OPENSSL_NO_EC) || CRYPTOGRAPHY_OPENSSL_LESS_THAN_102 || \
     defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x20020002L
 static const long Cryptography_HAS_EC_1_0_2 = 0;
 const char *(*EC_curve_nid2nist)(int) = NULL;

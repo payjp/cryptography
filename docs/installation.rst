@@ -13,7 +13,7 @@ Supported platforms
 Currently we test ``cryptography`` on Python 2.6, 2.7, 3.3, 3.4, 3.5, and PyPy
 2.6+ on these operating systems.
 
-* x86-64 CentOS 7.x, 6.4 and CentOS 5.x
+* x86-64 CentOS 7.x, 6.4
 * x86-64 FreeBSD 10
 * OS X 10.11 El Capitan, 10.10 Yosemite, 10.9 Mavericks, 10.8 Mountain Lion,
   and 10.7 Lion
@@ -28,8 +28,6 @@ Currently we test ``cryptography`` on Python 2.6, 2.7, 3.3, 3.4, 3.5, and PyPy
 We test compiling with ``clang`` as well as ``gcc`` and use the following
 OpenSSL releases:
 
-* ``OpenSSL 0.9.8e-fips-rhel5`` (``RHEL/CentOS 5``)
-* ``OpenSSL 0.9.8k``
 * ``OpenSSL 1.0.0-fips`` (``RHEL/CentOS 6.4``)
 * ``OpenSSL 1.0.1``
 * ``OpenSSL 1.0.1e-fips`` (``RHEL/CentOS 7``)
@@ -38,9 +36,8 @@ OpenSSL releases:
 * ``OpenSSL 1.0.2-latest``
 
 .. warning::
-    OpenSSL versions 0.9.8 and 1.0.0 are no longer supported by the OpenSSL
-    project. Support for OpenSSL 0.9.8 will be removed in the next
-    ``cryptography`` release.
+    OpenSSL 1.0.0 is no longer supported by the OpenSSL project. Cryptography
+    will drop support for it in a future release.
 
 On Windows
 ----------
@@ -183,8 +180,13 @@ dependencies.
 Building cryptography on OS X
 -----------------------------
 
+.. note::
+
+    If installation gives a ``fatal error: 'openssl/aes.h' file not found``
+    see the :doc:`FAQ </faq>` for information about how to fix this issue.
+
 The wheel package on OS X is a statically linked build (as of 1.0.1) so for
-users with pip 1.5 or above you only need one step:
+users with pip 8 or above you only need one step:
 
 .. code-block:: console
 
@@ -268,7 +270,7 @@ information, consult `Greg Wilson's blog post`_ on the subject.
 .. _`MacPorts`: https://www.macports.org
 .. _`openssl-release`: https://jenkins.cryptography.io/job/openssl-release/
 .. _`bug in conda`: https://github.com/conda/conda-recipes/issues/110
-.. _`Greg Wilson's blog post`: http://software-carpentry.org/blog/2014/04/mr-biczo-was-right.html
+.. _`Greg Wilson's blog post`: https://software-carpentry.org/blog/2014/04/mr-biczo-was-right.html
 .. _virtualenv: https://virtualenv.pypa.io/en/latest/
 .. _openssl.org: https://openssl.org/source/
 .. _`wheel cache`: https://pip.pypa.io/en/stable/reference/pip_install/#caching
