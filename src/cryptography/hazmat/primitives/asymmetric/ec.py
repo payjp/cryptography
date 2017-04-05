@@ -253,6 +253,19 @@ def generate_private_key(curve, backend):
     return backend.generate_elliptic_curve_private_key(curve)
 
 
+def derive_private_key(private_value, curve, backend):
+    if not isinstance(private_value, six.integer_types):
+        raise TypeError("private_value must be an integer type.")
+
+    if private_value <= 0:
+        raise ValueError("private_value must be a positive integer.")
+
+    if not isinstance(curve, EllipticCurve):
+        raise TypeError("curve must provide the EllipticCurve interface.")
+
+    return backend.derive_elliptic_curve_private_key(private_value, curve)
+
+
 class EllipticCurvePublicNumbers(object):
     def __init__(self, x, y, curve):
         if (

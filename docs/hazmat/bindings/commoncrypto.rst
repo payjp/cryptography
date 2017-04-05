@@ -8,7 +8,7 @@ CommonCrypto binding
 .. versionadded:: 0.2
 
 These are `CFFI`_ bindings to the `CommonCrypto`_ C library. It is only
-available on Mac OS X versions 10.8 and above.
+available on macOS versions 10.8 and above.
 
 .. class:: cryptography.hazmat.bindings.commoncrypto.binding.Binding()
 
@@ -27,4 +27,4 @@ available on Mac OS X versions 10.8 and above.
 
 
 .. _`CFFI`: https://cffi.readthedocs.io
-.. _`CommonCrypto`: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man3/Common%20Crypto.3cc.html
+.. _`CommonCrypto`: https://developer.apple.com/library/content/documentation/Security/Conceptual/cryptoservices/GeneralPurposeCrypto/GeneralPurposeCrypto.html#//apple_ref/doc/uid/TP40011172-CH9-SW10

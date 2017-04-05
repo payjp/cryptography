@@ -422,6 +422,16 @@ A specific ``backend`` may provide one or more of these interfaces.
         :returns: An instance of
             :class:`~cryptography.hazmat.primitives.asymmetric.ec.EllipticCurvePublicKey`.
 
+    .. method:: derive_elliptic_curve_private_key(private_value, curve)
+
+        :param private_value: A secret scalar value.
+
+        :param curve: An instance of
+            :class:`~cryptography.hazmat.primitives.asymmetric.ec.EllipticCurve`.
+
+        :returns: An instance of
+            :class:`~cryptography.hazmat.primitives.asymmetric.ec.EllipticCurvePrivateKey`.
+
 .. class:: PEMSerializationBackend
 
     .. versionadded:: 0.6
@@ -576,13 +586,23 @@ A specific ``backend`` may provide one or more of these interfaces.
         :returns: A new instance of
             :class:`~cryptography.x509.RevokedCertificate`.
 
+    .. method:: x509_name_bytes(name)
+
+        .. versionadded:: 1.6
+
+        :param name: An instance of :class:`~cryptography.x509.Name`.
+
+        :return bytes: The DER encoded bytes.
+
 .. class:: DHBackend
 
     .. versionadded:: 0.9
 
     A backend with methods for doing Diffie-Hellman key exchange.
 
-    .. method:: generate_dh_parameters(key_size)
+    .. method:: generate_dh_parameters(generator, key_size)
+
+        :param int generator: The generator to use. Often 2 or 5.
 
         :param int key_size: The bit length of the prime modulus to generate.
 
@@ -599,7 +619,9 @@ A specific ``backend`` may provide one or more of these interfaces.
         :return: A new instance of
             :class:`~cryptography.hazmat.primitives.asymmetric.dh.DHPrivateKey`.
 
-    .. method:: generate_dh_private_key_and_parameters(self, key_size)
+    .. method:: generate_dh_private_key_and_parameters(generator, key_size)
+
+        :param int generator: The generator to use. Often 2 or 5.
 
         :param int key_size: The bit length of the prime modulus to generate.
 
@@ -644,11 +666,50 @@ A specific ``backend`` may provide one or more of these interfaces.
         :raises cryptography.exceptions.UnsupportedAlgorithm: This is raised
             when any backend specific criteria are not met.
 
-    .. method:: dh_parameters_supported(p, g)
+    .. method:: dh_parameters_supported(p, g, q=None)
 
         :param int p: The p value of the DH key.
 
         :param int g: The g value of the DH key.
 
-        :returns: ``True`` if the given values of ``p`` and ``g`` are supported
-            by this backend, otherwise ``False``.
+        :param int q: The q value of the DH key.
+
+        :returns: ``True`` if the given values of ``p``, ``g`` and ``q``
+            are supported by this backend, otherwise ``False``.
+
+    .. versionadded:: 1.8
+
+    .. method:: dh_x942_serialization_supported()
+
+        :returns: True if serialization of DH objects with
+            subgroup order (q) is supported by this backend.
+
+
+.. class:: ScryptBackend
+
+    .. versionadded:: 1.6
+
+    A backend with methods for using Scrypt.
+
+    The following backends implement this interface:
+
+    * :doc:`/hazmat/backends/openssl`
+
+    .. method:: derive_scrypt(self, key_material, salt, length, n, r, p)
+
+        :param bytes key_material: The key material to use as a basis for
+            the derived key. This is typically a password.
+
+        :param bytes salt: A salt.
+
+        :param int length: The desired length of the derived key.
+
+        :param int n: CPU/Memory cost parameter. It must be larger than 1 and be a
+            power of 2.
+
+        :param int r: Block size parameter.
+
+        :param int p: Parallelization parameter.
+
+        :return bytes: Derived key.
+

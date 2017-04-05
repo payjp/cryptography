@@ -25,9 +25,9 @@ class _CipherContext(object):
         self._tag = None
 
         if isinstance(self._cipher, ciphers.BlockCipherAlgorithm):
-            self._block_size = self._cipher.block_size
+            self._block_size_bytes = self._cipher.block_size // 8
         else:
-            self._block_size = 1
+            self._block_size_bytes = 1
 
         ctx = self._backend._lib.EVP_CIPHER_CTX_new()
         ctx = self._backend._ffi.gc(
@@ -102,12 +102,28 @@ class _CipherContext(object):
 
     def update(self, data):
         buf = self._backend._ffi.new("unsigned char[]",
-                                     len(data) + self._block_size - 1)
+                                     len(data) + self._block_size_bytes - 1)
         outlen = self._backend._ffi.new("int *")
         res = self._backend._lib.EVP_CipherUpdate(self._ctx, buf, outlen, data,
                                                   len(data))
         self._backend.openssl_assert(res != 0)
         return self._backend._ffi.buffer(buf)[:outlen[0]]
+
+    def update_into(self, data, buf):
+        if len(buf) < (len(data) + self._block_size_bytes - 1):
+            raise ValueError(
+                "buffer must be at least {0} bytes for this "
+                "payload".format(len(data) + self._block_size_bytes - 1)
+            )
+
+        buf = self._backend._ffi.cast(
+            "unsigned char *", self._backend._ffi.from_buffer(buf)
+        )
+        outlen = self._backend._ffi.new("int *")
+        res = self._backend._lib.EVP_CipherUpdate(self._ctx, buf, outlen,
+                                                  data, len(data))
+        self._backend.openssl_assert(res != 0)
+        return outlen[0]
 
     def finalize(self):
         # OpenSSL 1.0.1 on Ubuntu 12.04 (and possibly other distributions)
@@ -118,7 +134,7 @@ class _CipherContext(object):
         if isinstance(self._mode, modes.GCM):
             self.update(b"")
 
-        buf = self._backend._ffi.new("unsigned char[]", self._block_size)
+        buf = self._backend._ffi.new("unsigned char[]", self._block_size_bytes)
         outlen = self._backend._ffi.new("int *")
         res = self._backend._lib.EVP_CipherFinal_ex(self._ctx, buf, outlen)
         if res == 0:
@@ -145,13 +161,12 @@ class _CipherContext(object):
 
         if (isinstance(self._mode, modes.GCM) and
            self._operation == self._ENCRYPT):
-            block_byte_size = self._block_size // 8
             tag_buf = self._backend._ffi.new(
-                "unsigned char[]", block_byte_size
+                "unsigned char[]", self._block_size_bytes
             )
             res = self._backend._lib.EVP_CIPHER_CTX_ctrl(
                 self._ctx, self._backend._lib.EVP_CTRL_GCM_GET_TAG,
-                block_byte_size, tag_buf
+                self._block_size_bytes, tag_buf
             )
             self._backend.openssl_assert(res != 0)
             self._tag = self._backend._ffi.buffer(tag_buf)[:]
@@ -168,38 +183,3 @@ class _CipherContext(object):
         self._backend.openssl_assert(res != 0)
 
     tag = utils.read_only_property("_tag")
-
-
-@utils.register_interface(ciphers.CipherContext)
-class _AESCTRCipherContext(object):
-    """
-    This is needed to provide support for AES CTR mode in OpenSSL 1.0.0. It can
-    be removed when we drop 1.0.0 support (RHEL 6.4 is the only thing that
-    ships it).
-    """
-    def __init__(self, backend, cipher, mode):
-        self._backend = backend
-
-        self._key = self._backend._ffi.new("AES_KEY *")
-        res = self._backend._lib.AES_set_encrypt_key(
-            cipher.key, len(cipher.key) * 8, self._key
-        )
-        self._backend.openssl_assert(res == 0)
-        self._ecount = self._backend._ffi.new("char[]", 16)
-        self._nonce = self._backend._ffi.new("char[16]", mode.nonce)
-        self._num = self._backend._ffi.new("unsigned int *", 0)
-
-    def update(self, data):
-        buf = self._backend._ffi.new("unsigned char[]", len(data))
-        self._backend._lib.AES_ctr128_encrypt(
-            data, buf, len(data), self._key, self._nonce,
-            self._ecount, self._num
-        )
-        return self._backend._ffi.buffer(buf)[:]
-
-    def finalize(self):
-        self._key = None
-        self._ecount = None
-        self._nonce = None
-        self._num = None
-        return b""

@@ -1,10 +1,142 @@
 Changelog
 =========
 
-1.5 - `master`_
+1.9 - `master`_
 ~~~~~~~~~~~~~~~
 
 .. note:: This version is not yet released and is under active development.
+
+
+1.8.1 - 2017-03-10
+~~~~~~~~~~~~~~~~~~
+
+* Fixed macOS wheels to properly link against 1.1.0 rather than 1.0.2.
+
+1.8 - 2017-03-09
+~~~~~~~~~~~~~~~~
+
+* Added support for Python 3.6.
+* Windows and macOS wheels now link against OpenSSL 1.1.0.
+* macOS wheels are no longer universal. This change significantly shrinks the
+  size of the wheels. Users on macOS 32-bit Python (if there are any) should
+  migrate to 64-bit or build their own packages.
+* Changed ASN.1 dependency from ``pyasn1`` to ``asn1crypto`` resulting in a
+  general performance increase when encoding/decoding ASN.1 structures. Also,
+  the ``pyasn1_modules`` test dependency is no longer required.
+* Added support for
+  :meth:`~cryptography.hazmat.primitives.ciphers.CipherContext.update_into` on
+  :class:`~cryptography.hazmat.primitives.ciphers.CipherContext`.
+* Added
+  :meth:`~cryptography.hazmat.primitives.asymmetric.dh.DHPrivateKeyWithSerialization.private_bytes`
+  to
+  :class:`~cryptography.hazmat.primitives.asymmetric.dh.DHPrivateKeyWithSerialization`.
+* Added
+  :meth:`~cryptography.hazmat.primitives.asymmetric.dh.DHPublicKeyWithSerialization.public_bytes`
+  to
+  :class:`~cryptography.hazmat.primitives.asymmetric.dh.DHPublicKeyWithSerialization`.
+* :func:`~cryptography.hazmat.primitives.serialization.load_pem_private_key`
+  and
+  :func:`~cryptography.hazmat.primitives.serialization.load_der_private_key`
+  now require that ``password`` must be bytes if provided. Previously this
+  was documented but not enforced.
+* Added support for subgroup order in :doc:`/hazmat/primitives/asymmetric/dh`.
+
+1.7.2 - 2017-01-27
+~~~~~~~~~~~~~~~~~~
+
+* Updated Windows and macOS wheels to be compiled against OpenSSL 1.0.2k.
+
+1.7.1 - 2016-12-13
+~~~~~~~~~~~~~~~~~~
+
+* Fixed a regression in ``int_from_bytes`` where it failed to accept
+  ``bytearray``.
+
+1.7 - 2016-12-12
+~~~~~~~~~~~~~~~~
+
+* Support for OpenSSL 1.0.0 has been removed. Users on older version of OpenSSL
+  will need to upgrade.
+* Added support for Diffie-Hellman key exchange using
+  :meth:`~cryptography.hazmat.primitives.asymmetric.dh.DHPrivateKeyWithSerialization.exchange`
+* The OS random engine for OpenSSL has been rewritten to improve compatibility
+  with embedded Python and other edge cases. More information about this change
+  can be found in the
+  `pull request <https://github.com/pyca/cryptography/pull/3229>`_.
+
+1.6 - 2016-11-22
+~~~~~~~~~~~~~~~~
+
+* Deprecated support for OpenSSL 1.0.0. Support will be removed in
+  ``cryptography`` 1.7.
+* Replaced the Python-based OpenSSL locking callbacks with a C version to fix
+  a potential deadlock that could occur if a garbage collection cycle occurred
+  while inside the lock.
+* Added support for :class:`~cryptography.hazmat.primitives.hashes.BLAKE2b` and
+  :class:`~cryptography.hazmat.primitives.hashes.BLAKE2s` when using OpenSSL
+  1.1.0.
+* Added
+  :attr:`~cryptography.x509.Certificate.signature_algorithm_oid` support to
+  :class:`~cryptography.x509.Certificate`.
+* Added
+  :attr:`~cryptography.x509.CertificateSigningRequest.signature_algorithm_oid`
+  support to :class:`~cryptography.x509.CertificateSigningRequest`.
+* Added
+  :attr:`~cryptography.x509.CertificateRevocationList.signature_algorithm_oid`
+  support to :class:`~cryptography.x509.CertificateRevocationList`.
+* Added support for :class:`~cryptography.hazmat.primitives.kdf.scrypt.Scrypt`
+  when using OpenSSL 1.1.0.
+* Added a workaround to improve compatibility with Python application bundling
+  tools like ``PyInstaller`` and ``cx_freeze``.
+* Added support for generating a
+  :meth:`~cryptography.x509.random_serial_number`.
+* Added support for encoding ``IPv4Network`` and ``IPv6Network`` in X.509
+  certificates for use with :class:`~cryptography.x509.NameConstraints`.
+* Added :meth:`~cryptography.x509.Name.public_bytes` to
+  :class:`~cryptography.x509.Name`.
+* Added :class:`~cryptography.x509.RelativeDistinguishedName`
+* :class:`~cryptography.x509.DistributionPoint` now accepts
+  :class:`~cryptography.x509.RelativeDistinguishedName` for
+  :attr:`~cryptography.x509.DistributionPoint.relative_name`.
+  Deprecated use of :class:`~cryptography.x509.Name` as
+  :attr:`~cryptography.x509.DistributionPoint.relative_name`.
+* :class:`~cryptography.x509.Name` now accepts an iterable of
+  :class:`~cryptography.x509.RelativeDistinguishedName`.  RDNs can
+  be accessed via the :attr:`~cryptography.x509.Name.rdns`
+  attribute.  When constructed with an iterable of
+  :class:`~cryptography.x509.NameAttribute`, each attribute becomes
+  a single-valued RDN.
+* Added
+  :func:`~cryptography.hazmat.primitives.asymmetric.ec.derive_private_key`.
+* Added support for signing and verifying RSA, DSA, and ECDSA signatures with
+  :class:`~cryptography.hazmat.primitives.asymmetric.utils.Prehashed`
+  digests.
+
+1.5.3 - 2016-11-05
+~~~~~~~~~~~~~~~~~~
+
+* **SECURITY ISSUE**: Fixed a bug where ``HKDF`` would return an empty
+  byte-string if used with a ``length`` less than ``algorithm.digest_size``.
+  Credit to **Markus Döring** for reporting the issue. *CVE-2016-9243*
+
+1.5.2 - 2016-09-26
+~~~~~~~~~~~~~~~~~~
+
+* Updated Windows and OS X wheels to be compiled against OpenSSL 1.0.2j.
+
+1.5.1 - 2016-09-22
+~~~~~~~~~~~~~~~~~~
+
+* Updated Windows and OS X wheels to be compiled against OpenSSL 1.0.2i.
+* Resolved a ``UserWarning`` when used with cffi 1.8.3.
+* Fixed a memory leak in name creation with X.509.
+* Added a workaround for old versions of setuptools.
+* Fixed an issue preventing ``cryptography`` from compiling against
+  OpenSSL 1.0.2i.
+
+
+1.5 - 2016-08-26
+~~~~~~~~~~~~~~~~
 
 * Added
   :func:`~cryptography.hazmat.primitives.asymmetric.padding.calculate_max_pss_salt_length`.
@@ -18,6 +150,13 @@ Changelog
   and
   :meth:`~cryptography.hazmat.primitives.asymmetric.ec.EllipticCurvePublicKey.verify`
   methods to ECDSA keys.
+* Switched back to the older callback model on Python 3.5 in order to mitigate
+  the locking callback problem with OpenSSL <1.1.0.
+* :class:`~cryptography.x509.CertificateBuilder`,
+  :class:`~cryptography.x509.CertificateRevocationListBuilder`, and
+  :class:`~cryptography.x509.RevokedCertificateBuilder` now accept timezone
+  aware ``datetime`` objects as method arguments
+* ``cryptography`` now supports OpenSSL 1.1.0 as a compilation target.
 
 
 1.4 - 2016-06-04
@@ -35,6 +174,9 @@ Changelog
   and
   :meth:`~cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey.verify`
   methods to RSA keys.
+* Deprecated the ``serial`` attribute on
+  :class:`~cryptography.x509.Certificate`, in favor of
+  :attr:`~cryptography.x509.Certificate.serial_number`.
 
 
 1.3.4 - 2016-06-03

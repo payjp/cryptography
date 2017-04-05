@@ -15,6 +15,7 @@ INCLUDES = """
  * Note that the result is an opaque type.
  */
 typedef STACK_OF(ASN1_OBJECT) Cryptography_STACK_OF_ASN1_OBJECT;
+typedef STACK_OF(X509_OBJECT) Cryptography_STACK_OF_X509_OBJECT;
 """
 
 TYPES = """
@@ -24,7 +25,9 @@ static const long Cryptography_HAS_X509_V_FLAG_TRUSTED_FIRST;
 static const long Cryptography_HAS_X509_V_FLAG_PARTIAL_CHAIN;
 
 typedef ... Cryptography_STACK_OF_ASN1_OBJECT;
+typedef ... Cryptography_STACK_OF_X509_OBJECT;
 
+typedef ... X509_OBJECT;
 typedef ... X509_STORE;
 typedef ... X509_VERIFY_PARAM;
 typedef ... X509_STORE_CTX;
@@ -119,6 +122,9 @@ static const long X509_V_FLAG_SUITEB_128_LOS_ONLY;
 static const long X509_V_FLAG_SUITEB_192_LOS;
 static const long X509_V_FLAG_SUITEB_128_LOS;
 static const long X509_V_FLAG_PARTIAL_CHAIN;
+
+static const long X509_LU_X509;
+static const long X509_LU_CRL;
 """
 
 FUNCTIONS = """
@@ -172,6 +178,7 @@ int X509_VERIFY_PARAM_set1_policies(X509_VERIFY_PARAM *,
                                     Cryptography_STACK_OF_ASN1_OBJECT *);
 void X509_VERIFY_PARAM_set_depth(X509_VERIFY_PARAM *, int);
 int X509_VERIFY_PARAM_get_depth(const X509_VERIFY_PARAM *);
+void X509_VERIFY_PARAM_free(X509_VERIFY_PARAM *);
 """
 
 MACROS = """
@@ -192,15 +199,27 @@ int X509_VERIFY_PARAM_set1_email(X509_VERIFY_PARAM *, const char *,
 int X509_VERIFY_PARAM_set1_ip(X509_VERIFY_PARAM *, const unsigned char *,
                               size_t);
 int X509_VERIFY_PARAM_set1_ip_asc(X509_VERIFY_PARAM *, const char *);
+
+int sk_X509_OBJECT_num(Cryptography_STACK_OF_X509_OBJECT *);
+X509_OBJECT *sk_X509_OBJECT_value(Cryptography_STACK_OF_X509_OBJECT *, int);
+X509_VERIFY_PARAM *X509_STORE_get0_param(X509_STORE *);
+Cryptography_STACK_OF_X509_OBJECT *X509_STORE_get0_objects(X509_STORE *);
+X509 *X509_OBJECT_get0_X509(X509_OBJECT *);
+int X509_OBJECT_get_type(const X509_OBJECT *);
+
+/* added in 1.1.0 */
+X509 *X509_STORE_CTX_get0_cert(X509_STORE_CTX *);
 """
 
 CUSTOMIZATIONS = """
-/* OpenSSL 1.0.2beta2+ verification error codes */
-#if CRYPTOGRAPHY_OPENSSL_102BETA2_OR_GREATER && \
-    !defined(LIBRESSL_VERSION_NUMBER)
+/* OpenSSL 1.0.2beta2+ verification parameters and error codes */
+#if CRYPTOGRAPHY_OPENSSL_102BETA2_OR_GREATER
 static const long Cryptography_HAS_102_VERIFICATION_ERROR_CODES = 1;
+static const long Cryptography_HAS_102_VERIFICATION_PARAMS = 1;
 #else
 static const long Cryptography_HAS_102_VERIFICATION_ERROR_CODES = 0;
+static const long Cryptography_HAS_102_VERIFICATION_PARAMS = 0;
+
 static const long X509_V_ERR_SUITE_B_INVALID_VERSION = 0;
 static const long X509_V_ERR_SUITE_B_INVALID_ALGORITHM = 0;
 static const long X509_V_ERR_SUITE_B_INVALID_CURVE = 0;
@@ -210,14 +229,7 @@ static const long X509_V_ERR_SUITE_B_CANNOT_SIGN_P_384_WITH_P_256 = 0;
 static const long X509_V_ERR_HOSTNAME_MISMATCH = 0;
 static const long X509_V_ERR_EMAIL_MISMATCH = 0;
 static const long X509_V_ERR_IP_ADDRESS_MISMATCH = 0;
-#endif
 
-/* OpenSSL 1.0.2beta2+ verification parameters */
-#if CRYPTOGRAPHY_OPENSSL_102BETA2_OR_GREATER && \
-    !defined(LIBRESSL_VERSION_NUMBER)
-static const long Cryptography_HAS_102_VERIFICATION_PARAMS = 1;
-#else
-static const long Cryptography_HAS_102_VERIFICATION_PARAMS = 0;
 /* X509_V_FLAG_TRUSTED_FIRST is also new in 1.0.2+, but it is added separately
    below because it shows up in some earlier 3rd party OpenSSL packages. */
 static const long X509_V_FLAG_SUITEB_128_LOS_ONLY = 0;
@@ -249,5 +261,29 @@ static const long Cryptography_HAS_X509_V_FLAG_TRUSTED_FIRST = 1;
 #else
 static const long Cryptography_HAS_X509_V_FLAG_TRUSTED_FIRST = 0;
 static const long X509_V_FLAG_TRUSTED_FIRST = 0;
+#endif
+
+#if CRYPTOGRAPHY_OPENSSL_LESS_THAN_110PRE6
+Cryptography_STACK_OF_X509_OBJECT *X509_STORE_get0_objects(X509_STORE *ctx) {
+    return ctx->objs;
+}
+X509_VERIFY_PARAM *X509_STORE_get0_param(X509_STORE *store) {
+    return store->param;
+}
+int X509_OBJECT_get_type(const X509_OBJECT *x) {
+    return x->type;
+}
+#endif
+
+#if CRYPTOGRAPHY_OPENSSL_LESS_THAN_110PRE5
+/* from x509/x509_vfy.c */
+X509 *X509_STORE_CTX_get0_cert(X509_STORE_CTX *ctx)
+{
+    return ctx->cert;
+}
+
+X509 *X509_OBJECT_get0_X509(X509_OBJECT *x) {
+    return x->data.x509;
+}
 #endif
 """
