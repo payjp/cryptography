@@ -213,7 +213,7 @@ X509 *X509_STORE_CTX_get0_cert(X509_STORE_CTX *);
 
 CUSTOMIZATIONS = """
 /* OpenSSL 1.0.2beta2+ verification parameters and error codes */
-#if CRYPTOGRAPHY_OPENSSL_102BETA2_OR_GREATER
+#if CRYPTOGRAPHY_OPENSSL_102BETA2_OR_GREATER && !CRYPTOGRAPHY_IS_LIBRESSL
 static const long Cryptography_HAS_102_VERIFICATION_ERROR_CODES = 1;
 static const long Cryptography_HAS_102_VERIFICATION_PARAMS = 1;
 #else
@@ -226,9 +226,11 @@ static const long X509_V_ERR_SUITE_B_INVALID_CURVE = 0;
 static const long X509_V_ERR_SUITE_B_INVALID_SIGNATURE_ALGORITHM = 0;
 static const long X509_V_ERR_SUITE_B_LOS_NOT_ALLOWED = 0;
 static const long X509_V_ERR_SUITE_B_CANNOT_SIGN_P_384_WITH_P_256 = 0;
+#if LIBRESSL_VERSION_NUMBER < 0x20500001L
 static const long X509_V_ERR_HOSTNAME_MISMATCH = 0;
 static const long X509_V_ERR_EMAIL_MISMATCH = 0;
 static const long X509_V_ERR_IP_ADDRESS_MISMATCH = 0;
+#endif
 
 /* X509_V_FLAG_TRUSTED_FIRST is also new in 1.0.2+, but it is added separately
    below because it shows up in some earlier 3rd party OpenSSL packages. */
