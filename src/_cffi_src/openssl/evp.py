@@ -170,7 +170,6 @@ int EVP_PKEY_CTX_set_signature_md(EVP_PKEY_CTX *, const EVP_MD *);
 int EVP_PKEY_derive_init(EVP_PKEY_CTX *ctx);
 int EVP_PKEY_derive_set_peer(EVP_PKEY_CTX *ctx, EVP_PKEY *peer);
 int EVP_PKEY_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen);
-
 int EVP_PBE_scrypt(const char *, size_t, const unsigned char *, size_t,
                    uint64_t, uint64_t, uint64_t, uint64_t, unsigned char *,
                    size_t);
