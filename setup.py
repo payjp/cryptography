@@ -34,10 +34,11 @@ with open(os.path.join(src_dir, "cryptography", "__about__.py")) as f:
 VECTORS_DEPENDENCY = "cryptography_vectors=={0}".format(about['__version__'])
 
 requirements = [
-    "idna>=2.0",
-    "pyasn1>=0.1.8",
+    "idna>=2.1",
+    "asn1crypto>=0.21.0",
+    "packaging",
     "six>=1.4.1",
-    "setuptools>=11.3",
+    "setuptools>=20.5",
 ]
 setup_requirements = []
 
@@ -61,7 +62,7 @@ test_requirements = [
     "pytest>=2.9.0",
     "pretend",
     "iso8601",
-    "pyasn1_modules",
+    "pytz",
 ]
 if sys.version_info[:2] > (2, 6):
     test_requirements.append("hypothesis>=1.11.4")
@@ -296,6 +297,7 @@ setup(
         "Programming Language :: Python :: 3.3",
         "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Topic :: Security :: Cryptography",
@@ -312,7 +314,7 @@ setup(
         "docstest": [
             "doc8",
             "pyenchant",
-            "readme_renderer",
+            "readme_renderer >= 16.0",
             "sphinx",
             "sphinx_rtd_theme",
             "sphinxcontrib-spelling",

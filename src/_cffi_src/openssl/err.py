@@ -17,6 +17,7 @@ struct ERR_string_data_st {
     const char *string;
 };
 typedef struct ERR_string_data_st ERR_STRING_DATA;
+typedef ... ERR_STATE;
 
 static const int ERR_LIB_DH;
 static const int ERR_LIB_EVP;
@@ -56,6 +57,7 @@ static const int ASN1_F_B64_READ_ASN1;
 static const int ASN1_F_B64_WRITE_ASN1;
 static const int ASN1_F_SMIME_READ_ASN1;
 static const int ASN1_F_SMIME_TEXT;
+static const int ASN1_F_ASN1_CHECK_TLEN;
 
 static const int ASN1_R_BOOLEAN_IS_WRONG_LENGTH;
 static const int ASN1_R_BUFFER_TOO_SMALL;
@@ -80,6 +82,7 @@ static const int ASN1_R_WRONG_TAG;
 static const int ASN1_R_NO_CONTENT_TYPE;
 static const int ASN1_R_NO_MULTIPART_BODY_FAILURE;
 static const int ASN1_R_NO_MULTIPART_BOUNDARY;
+static const int ASN1_R_HEADER_TOO_LONG;
 
 static const int DH_F_COMPUTE_KEY;
 
@@ -126,7 +129,6 @@ static const int EVP_R_NO_CIPHER_SET;
 static const int EVP_R_NO_DIGEST_SET;
 static const int EVP_R_PUBLIC_KEY_NOT_RSA;
 static const int EVP_R_UNKNOWN_PBE_ALGORITHM;
-static const int EVP_R_UNSUPORTED_NUMBER_OF_ROUNDS;
 static const int EVP_R_UNSUPPORTED_CIPHER;
 static const int EVP_R_UNSUPPORTED_KEY_DERIVATION_FUNCTION;
 static const int EVP_R_UNSUPPORTED_KEYLENGTH;
@@ -196,9 +198,36 @@ static const int SSL_TLSEXT_ERR_ALERT_WARNING;
 static const int SSL_TLSEXT_ERR_ALERT_FATAL;
 static const int SSL_TLSEXT_ERR_NOACK;
 
-static const int SSL_AD_INTERNAL_ERROR;
-static const int SSL_AD_ACCESS_DENIED;
+static const int SSL_AD_CLOSE_NOTIFY;
+static const int SSL_AD_UNEXPECTED_MESSAGE;
+static const int SSL_AD_BAD_RECORD_MAC;
+static const int SSL_AD_RECORD_OVERFLOW;
+static const int SSL_AD_DECOMPRESSION_FAILURE;
 static const int SSL_AD_HANDSHAKE_FAILURE;
+static const int SSL_AD_BAD_CERTIFICATE;
+static const int SSL_AD_UNSUPPORTED_CERTIFICATE;
+static const int SSL_AD_CERTIFICATE_REVOKED;
+static const int SSL_AD_CERTIFICATE_EXPIRED;
+static const int SSL_AD_CERTIFICATE_UNKNOWN;
+static const int SSL_AD_ILLEGAL_PARAMETER;
+static const int SSL_AD_UNKNOWN_CA;
+static const int SSL_AD_ACCESS_DENIED;
+static const int SSL_AD_DECODE_ERROR;
+static const int SSL_AD_DECRYPT_ERROR;
+static const int SSL_AD_PROTOCOL_VERSION;
+static const int SSL_AD_INSUFFICIENT_SECURITY;
+static const int SSL_AD_INTERNAL_ERROR;
+static const int SSL_AD_USER_CANCELLED;
+static const int SSL_AD_NO_RENEGOTIATION;
+
+static const int SSL_AD_UNSUPPORTED_EXTENSION;
+static const int SSL_AD_CERTIFICATE_UNOBTAINABLE;
+static const int SSL_AD_UNRECOGNIZED_NAME;
+static const int SSL_AD_BAD_CERTIFICATE_STATUS_RESPONSE;
+static const int SSL_AD_BAD_CERTIFICATE_HASH_VALUE;
+static const int SSL_AD_UNKNOWN_PSK_IDENTITY;
+
+static const int X509_R_CERT_ALREADY_IN_HASH_TABLE;
 """
 
 FUNCTIONS = """
@@ -225,6 +254,7 @@ unsigned long ERR_peek_last_error_line_data(const char **,
 void ERR_put_error(int, int, int, const char *, int);
 void ERR_add_error_data(int, ...);
 int ERR_get_next_error_library(void);
+ERR_STATE *ERR_get_state(void);
 """
 
 MACROS = """
@@ -239,14 +269,7 @@ int ERR_GET_REASON(unsigned long);
 """
 
 CUSTOMIZATIONS = """
-// OpenSSL without EC. e.g. RHEL
-#ifndef OPENSSL_NO_EC
 static const long Cryptography_HAS_EC_CODES = 1;
-#else
-static const long Cryptography_HAS_EC_CODES = 0;
-static const int EC_R_UNKNOWN_GROUP = 0;
-static const int EC_F_EC_GROUP_NEW_BY_CURVE_NAME = 0;
-#endif
 
 #ifdef RSA_R_PKCS_DECODING_ERROR
 static const long Cryptography_HAS_RSA_R_PKCS_DECODING_ERROR = 1;

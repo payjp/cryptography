@@ -45,11 +45,19 @@ def _decode_x509_name_entry(backend, x509_name_entry):
 def _decode_x509_name(backend, x509_name):
     count = backend._lib.X509_NAME_entry_count(x509_name)
     attributes = []
+    prev_set_id = -1
     for x in range(count):
         entry = backend._lib.X509_NAME_get_entry(x509_name, x)
-        attributes.append(_decode_x509_name_entry(backend, entry))
+        attribute = _decode_x509_name_entry(backend, entry)
+        set_id = backend._lib.Cryptography_X509_NAME_ENTRY_set(entry)
+        if set_id != prev_set_id:
+            attributes.append(set([attribute]))
+        else:
+            # is in the same RDN a previous entry
+            attributes[-1].add(attribute)
+        prev_set_id = set_id
 
-    return x509.Name(attributes)
+    return x509.Name(x509.RelativeDistinguishedName(rdn) for rdn in attributes)
 
 
 def _decode_general_names(backend, gns):
@@ -240,7 +248,8 @@ class _X509ExtensionParser(object):
 
 def _decode_certificate_policies(backend, cp):
     cp = backend._ffi.cast("Cryptography_STACK_OF_POLICYINFO *", cp)
-    cp = backend._ffi.gc(cp, backend._lib.sk_POLICYINFO_free)
+    cp = backend._ffi.gc(cp, backend._lib.CERTIFICATEPOLICIES_free)
+
     num = backend._lib.sk_POLICYINFO_num(cp)
     certificate_policies = []
     for i in range(num):
@@ -481,9 +490,9 @@ _DISTPOINT_TYPE_RELATIVENAME = 1
 
 def _decode_crl_distribution_points(backend, cdps):
     cdps = backend._ffi.cast("Cryptography_STACK_OF_DIST_POINT *", cdps)
-    cdps = backend._ffi.gc(cdps, backend._lib.sk_DIST_POINT_free)
-    num = backend._lib.sk_DIST_POINT_num(cdps)
+    cdps = backend._ffi.gc(cdps, backend._lib.CRL_DIST_POINTS_free)
 
+    num = backend._lib.sk_DIST_POINT_num(cdps)
     dist_points = []
     for i in range(num):
         full_name = None
@@ -544,21 +553,25 @@ def _decode_crl_distribution_points(backend, cdps):
                 )
             # OpenSSL code doesn't test for a specific type for
             # relativename, everything that isn't fullname is considered
-            # relativename.
+            # relativename.  Per RFC 5280:
+            #
+            # DistributionPointName ::= CHOICE {
+            #      fullName                [0]      GeneralNames,
+            #      nameRelativeToCRLIssuer [1]      RelativeDistinguishedName }
             else:
                 rns = cdp.distpoint.name.relativename
                 rnum = backend._lib.sk_X509_NAME_ENTRY_num(rns)
-                attributes = []
+                attributes = set()
                 for i in range(rnum):
                     rn = backend._lib.sk_X509_NAME_ENTRY_value(
                         rns, i
                     )
                     backend.openssl_assert(rn != backend._ffi.NULL)
-                    attributes.append(
+                    attributes.add(
                         _decode_x509_name_entry(backend, rn)
                     )
 
-                relative_name = x509.Name(attributes)
+                relative_name = x509.RelativeDistinguishedName(attributes)
 
         dist_points.append(
             x509.DistributionPoint(

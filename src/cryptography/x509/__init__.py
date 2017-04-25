@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+from cryptography.x509 import certificate_transparency
 from cryptography.x509.base import (
     Certificate, CertificateBuilder, CertificateRevocationList,
     CertificateRevocationListBuilder,
@@ -11,6 +12,7 @@ from cryptography.x509.base import (
     InvalidVersion, RevokedCertificate, RevokedCertificateBuilder,
     Version, load_der_x509_certificate, load_der_x509_crl, load_der_x509_csr,
     load_pem_x509_certificate, load_pem_x509_crl, load_pem_x509_csr,
+    random_serial_number,
 )
 from cryptography.x509.extensions import (
     AccessDescription, AuthorityInformationAccess,
@@ -29,7 +31,9 @@ from cryptography.x509.general_name import (
     RegisteredID, UniformResourceIdentifier, UnsupportedGeneralNameType,
     _GENERAL_NAMES
 )
-from cryptography.x509.name import Name, NameAttribute
+from cryptography.x509.name import (
+    Name, NameAttribute, RelativeDistinguishedName
+)
 from cryptography.x509.oid import (
     AuthorityInformationAccessOID, CRLEntryExtensionOID,
     CertificatePoliciesOID, ExtendedKeyUsageOID, ExtensionOID, NameOID,
@@ -107,12 +111,14 @@ OID_OCSP = AuthorityInformationAccessOID.OCSP
 
 
 __all__ = [
+    "certificate_transparency",
     "load_pem_x509_certificate",
     "load_der_x509_certificate",
     "load_pem_x509_csr",
     "load_der_x509_csr",
     "load_pem_x509_crl",
     "load_der_x509_crl",
+    "random_serial_number",
     "InvalidVersion",
     "DuplicateExtension",
     "UnsupportedExtension",
@@ -120,6 +126,7 @@ __all__ = [
     "UnsupportedGeneralNameType",
     "NameAttribute",
     "Name",
+    "RelativeDistinguishedName",
     "ObjectIdentifier",
     "ExtensionType",
     "Extensions",

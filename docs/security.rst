@@ -36,7 +36,7 @@ Examples of things we wouldn't consider security issues:
 
 In general, if you're unsure, we request that you to default to treating things
 as security issues and handling them sensitively, the worst thing that can
-happen is that we'll ask you to file a bug issue.
+happen is that we'll ask you to file a public issue.
 
 Reporting a security issue
 --------------------------
@@ -64,7 +64,7 @@ New releases for OpenSSL updates
 --------------------------------
 
 As of version 0.5, ``cryptography`` statically links OpenSSL on Windows, and as
-of version 1.0.1 on OS X, to ease installation. Due to this, ``cryptography``
+of version 1.0.1 on macOS, to ease installation. Due to this, ``cryptography``
 will release a new version whenever OpenSSL has a security or bug fix release to
 avoid shipping insecure software.
 
@@ -109,7 +109,7 @@ and public disclosure may be shortened considerably.
 
 The list of people and organizations who receives advanced notification of
 security issues is not and will not be made public. This list generally
-consists of high profile downstream distributors and is entirely at the
+consists of high-profile downstream distributors and is entirely at the
 discretion of the ``cryptography`` team.
 
 .. _`master`: https://github.com/pyca/cryptography

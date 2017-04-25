@@ -20,6 +20,23 @@ Elliptic curve cryptography
     :returns: A new instance of :class:`EllipticCurvePrivateKey`.
 
 
+.. function:: derive_private_key(private_value, curve, backend)
+
+    .. versionadded:: 1.6
+
+    Derive a private key from ``private_value`` on ``curve`` for use with
+    ``backend``.
+
+    :param int private_value: The secret scalar value.
+
+    :param curve: An instance of :class:`EllipticCurve`.
+
+    :param backend: An instance of
+        :class:`~cryptography.hazmat.backends.interfaces.EllipticCurveBackend`.
+
+    :returns: A new instance of :class:`EllipticCurvePrivateKey`.
+
+
 Elliptic Curve Signature Algorithms
 -----------------------------------
 
@@ -59,6 +76,21 @@ Elliptic Curve Signature Algorithms
     The ``signature`` is a ``bytes`` object, whose contents is DER encoded as
     described in :rfc:`3279`. This can be decoded using
     :func:`~cryptography.hazmat.primitives.asymmetric.utils.decode_dss_signature`.
+
+
+    Verification requires the public key, the signature itself, the signed data, and knowledge of the hashing algorithm that was used when producing the signature:
+
+    >>> public_key = private_key.public_key()
+    >>> verifier = public_key.verifier(signature, ec.ECDSA(hashes.SHA256()))
+    >>> verifier.update(b"this is some data I'd like")
+    >>> verifier.update(b" to sign")
+    >>> verifier.verify()
+    True
+
+    The last call will either return ``True`` or raise an :class:`~cryptography.exceptions.InvalidSignature` exception.
+
+    .. note::
+        Although in this case the public key was derived from the private one, in a typical setting you will not possess the private key. The `Key loading`_ section explains how to load the public key from other sources.
 
 
 
@@ -352,12 +384,16 @@ Key Interfaces
 .. class:: EllipticCurveSignatureAlgorithm
 
     .. versionadded:: 0.5
+    .. versionchanged:: 1.6
+        :class:`~cryptography.hazmat.primitives.asymmetric.utils.Prehashed`
+        can now be used as an ``algorithm``.
 
     A signature algorithm for use with elliptic curve keys.
 
     .. attribute:: algorithm
 
-        :type: :class:`~cryptography.hazmat.primitives.hashes.HashAlgorithm`
+        :type: :class:`~cryptography.hazmat.primitives.hashes.HashAlgorithm` or
+            :class:`~cryptography.hazmat.primitives.asymmetric.utils.Prehashed`
 
         The digest algorithm to be used with the signature scheme.
 
@@ -385,7 +421,7 @@ Key Interfaces
 
         .. versionadded:: 1.1
 
-        Perform's a key exchange operation using the provided algorithm with
+        Performs a key exchange operation using the provided algorithm with
         the peer's public key.
 
         For most applications the result should be passed to a key derivation
@@ -415,7 +451,7 @@ Key Interfaces
         :param bytes data: The message string to sign.
 
         :param signature_algorithm: An instance of
-            :class:`EllipticCurveSignatureAlgorithm`.
+            :class:`EllipticCurveSignatureAlgorithm`, such as :class:`ECDSA`.
 
         :return bytes: Signature.
 
@@ -531,6 +567,70 @@ Key Interfaces
     .. versionadded:: 0.6
 
     Alias for :class:`EllipticCurvePublicKey`.
+
+
+
+Serialization
+~~~~~~~~~~~~~
+
+This sample demonstrates how to generate a private key and serialize it.
+
+
+.. doctest::
+
+    >>> from cryptography.hazmat.backends import default_backend
+    >>> from cryptography.hazmat.primitives import hashes
+    >>> from cryptography.hazmat.primitives.asymmetric import ec
+    >>> from cryptography.hazmat.primitives import serialization
+
+    >>> private_key = ec.generate_private_key(ec.SECP384R1(), default_backend())
+
+    >>> serialized_private = private_key.private_bytes(
+    ...     encoding=serialization.Encoding.PEM,
+    ...     format=serialization.PrivateFormat.PKCS8,
+    ...     encryption_algorithm=serialization.BestAvailableEncryption(b'testpassword')
+    ...     )
+    >>> serialized_private.splitlines()[0]
+    '-----BEGIN ENCRYPTED PRIVATE KEY-----'
+
+You can also serialize the key without a password, by relying on
+:class:`~cryptography.hazmat.primitives.serialization.NoEncryption`.
+
+The public key is serialized as follows:
+
+
+.. doctest::
+
+    >>> public_key = private_key.public_key()
+    >>> serialized_public = public_key.public_bytes(
+    ...     encoding=serialization.Encoding.PEM,
+    ...     format=serialization.PublicFormat.SubjectPublicKeyInfo
+    ...     )
+    >>> serialized_public.splitlines()[0]
+    '-----BEGIN PUBLIC KEY-----'
+
+This is the part that you would normally share with the rest of the world.
+
+
+Key loading
+~~~~~~~~~~~
+
+This extends the sample in the previous section, assuming that the variables
+``serialized_private`` and ``serialized_public`` contain the respective keys
+in PEM format.
+
+.. doctest::
+
+    >>> loaded_public_key = serialization.load_pem_public_key(
+    ...    serialized_public,
+    ...    backend=default_backend()
+    ...    )
+
+    >>> loaded_private_key = serialization.load_pem_private_key(
+    ...    serialized_private,
+    ...    password=b'testpassword',  # or password=None, if in plain text
+    ...    backend=default_backend()
+    ...    )
 
 
 .. _`FIPS 186-3`: http://csrc.nist.gov/publications/fips/fips186-3/fips_186-3.pdf

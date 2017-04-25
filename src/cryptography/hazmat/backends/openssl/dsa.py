@@ -6,29 +6,41 @@ from __future__ import absolute_import, division, print_function
 
 from cryptography import utils
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.backends.openssl.utils import _truncate_digest
+from cryptography.hazmat.backends.openssl.utils import (
+    _calculate_digest_and_algorithm
+)
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import (
     AsymmetricSignatureContext, AsymmetricVerificationContext, dsa
 )
 
 
-def _truncate_digest_for_dsa(dsa_cdata, digest, backend):
-    """
-    This function truncates digests that are longer than a given DS
-    key's length so they can be signed. OpenSSL does this for us in
-    1.0.0c+, leaving us with three releases (1.0.0, 1.0.0a, and 1.0.0b) where
-    this is a problem.
-    """
+def _dsa_sig_sign(backend, private_key, data):
+    sig_buf_len = backend._lib.DSA_size(private_key._dsa_cdata)
+    sig_buf = backend._ffi.new("unsigned char[]", sig_buf_len)
+    buflen = backend._ffi.new("unsigned int *")
 
-    q = backend._ffi.new("BIGNUM **")
-    backend._lib.DSA_get0_pqg(
-        dsa_cdata, backend._ffi.NULL, q, backend._ffi.NULL
+    # The first parameter passed to DSA_sign is unused by OpenSSL but
+    # must be an integer.
+    res = backend._lib.DSA_sign(
+        0, data, len(data), sig_buf, buflen, private_key._dsa_cdata
     )
-    backend.openssl_assert(q[0] != backend._ffi.NULL)
+    backend.openssl_assert(res == 1)
+    backend.openssl_assert(buflen[0])
 
-    order_bits = backend._lib.BN_num_bits(q[0])
-    return _truncate_digest(digest, order_bits)
+    return backend._ffi.buffer(sig_buf)[:buflen[0]]
+
+
+def _dsa_sig_verify(backend, public_key, signature, data):
+    # The first parameter passed to DSA_verify is unused by OpenSSL but
+    # must be an integer.
+    res = backend._lib.DSA_verify(
+        0, data, len(data), signature, len(signature), public_key._dsa_cdata
+    )
+
+    if res != 1:
+        backend._consume_errors()
+        raise InvalidSignature
 
 
 @utils.register_interface(AsymmetricVerificationContext)
@@ -47,19 +59,9 @@ class _DSAVerificationContext(object):
     def verify(self):
         data_to_verify = self._hash_ctx.finalize()
 
-        data_to_verify = _truncate_digest_for_dsa(
-            self._public_key._dsa_cdata, data_to_verify, self._backend
+        _dsa_sig_verify(
+            self._backend, self._public_key, self._signature, data_to_verify
         )
-
-        # The first parameter passed to DSA_verify is unused by OpenSSL but
-        # must be an integer.
-        res = self._backend._lib.DSA_verify(
-            0, data_to_verify, len(data_to_verify), self._signature,
-            len(self._signature), self._public_key._dsa_cdata)
-
-        if res != 1:
-            self._backend._consume_errors()
-            raise InvalidSignature
 
 
 @utils.register_interface(AsymmetricSignatureContext)
@@ -75,22 +77,7 @@ class _DSASignatureContext(object):
 
     def finalize(self):
         data_to_sign = self._hash_ctx.finalize()
-        data_to_sign = _truncate_digest_for_dsa(
-            self._private_key._dsa_cdata, data_to_sign, self._backend
-        )
-        sig_buf_len = self._backend._lib.DSA_size(self._private_key._dsa_cdata)
-        sig_buf = self._backend._ffi.new("unsigned char[]", sig_buf_len)
-        buflen = self._backend._ffi.new("unsigned int *")
-
-        # The first parameter passed to DSA_sign is unused by OpenSSL but
-        # must be an integer.
-        res = self._backend._lib.DSA_sign(
-            0, data_to_sign, len(data_to_sign), sig_buf,
-            buflen, self._private_key._dsa_cdata)
-        self._backend.openssl_assert(res == 1)
-        self._backend.openssl_assert(buflen[0])
-
-        return self._backend._ffi.buffer(sig_buf)[:buflen[0]]
+        return _dsa_sig_sign(self._backend, self._private_key, data_to_sign)
 
 
 @utils.register_interface(dsa.DSAParametersWithNumbers)
@@ -198,9 +185,10 @@ class _DSAPrivateKey(object):
         )
 
     def sign(self, data, algorithm):
-        signer = self.signer(algorithm)
-        signer.update(data)
-        return signer.finalize()
+        data, algorithm = _calculate_digest_and_algorithm(
+            self._backend, data, algorithm
+        )
+        return _dsa_sig_sign(self._backend, self, data)
 
 
 @utils.register_interface(dsa.DSAPublicKeyWithSerialization)
@@ -270,6 +258,7 @@ class _DSAPublicKey(object):
         )
 
     def verify(self, signature, data, algorithm):
-        verifier = self.verifier(signature, algorithm)
-        verifier.update(data)
-        verifier.verify()
+        data, algorithm = _calculate_digest_and_algorithm(
+            self._backend, data, algorithm
+        )
+        return _dsa_sig_verify(self._backend, self, signature, data)

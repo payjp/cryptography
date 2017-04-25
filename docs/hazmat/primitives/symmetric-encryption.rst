@@ -43,14 +43,14 @@ in an "encrypt-then-MAC" formulation as `described by Colin Percival`_.
 
     :param algorithms: A
         :class:`~cryptography.hazmat.primitives.ciphers.CipherAlgorithm`
-        provider such as those described
+        instance such as those described
         :ref:`below <symmetric-encryption-algorithms>`.
     :param mode: A :class:`~cryptography.hazmat.primitives.ciphers.modes.Mode`
-        provider such as those described
+        instance such as those described
         :ref:`below <symmetric-encryption-modes>`.
     :param backend: A
         :class:`~cryptography.hazmat.backends.interfaces.CipherBackend`
-        provider.
+        instance.
 
     :raises cryptography.exceptions.UnsupportedAlgorithm: This is raised if the
         provided ``backend`` does not implement
@@ -60,7 +60,7 @@ in an "encrypt-then-MAC" formulation as `described by Colin Percival`_.
 
         :return: An encrypting
             :class:`~cryptography.hazmat.primitives.ciphers.CipherContext`
-            provider.
+            instance.
 
         If the backend doesn't support the requested combination of ``cipher``
         and ``mode`` an :class:`~cryptography.exceptions.UnsupportedAlgorithm`
@@ -70,7 +70,7 @@ in an "encrypt-then-MAC" formulation as `described by Colin Percival`_.
 
         :return: A decrypting
             :class:`~cryptography.hazmat.primitives.ciphers.CipherContext`
-            provider.
+            instance.
 
         If the backend doesn't support the requested combination of ``cipher``
         and ``mode`` an :class:`~cryptography.exceptions.UnsupportedAlgorithm`
@@ -106,7 +106,7 @@ Algorithms
     Triple DES (Data Encryption Standard), sometimes referred to as 3DES, is a
     block cipher standardized by NIST. Triple DES has known crypto-analytic
     flaws, however none of them currently enable a practical attack.
-    Nonetheless, Triples DES is not recommended for new applications because it
+    Nonetheless, Triple DES is not recommended for new applications because it
     is incredibly slow; old applications should consider moving away from it.
 
     :param bytes key: The secret key. This must be kept secret. Either ``64``,
@@ -341,6 +341,7 @@ Modes
 
         import os
 
+        from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives.ciphers import (
             Cipher, algorithms, modes
         )
@@ -456,6 +457,49 @@ Interfaces
         return bytes immediately, however in other modes it will return chunks
         whose size is determined by the cipher's block size.
 
+    .. method:: update_into(data, buf)
+
+        .. versionadded:: 1.8
+
+        .. warning::
+
+            This method allows you to avoid a memory copy by passing a writable
+            buffer and reading the resulting data. You are responsible for
+            correctly sizing the buffer and properly handling the data. This
+            method should only be used when extremely high performance is a
+            requirement and you will be making many small calls to
+            ``update_into``.
+
+        :param bytes data: The data you wish to pass into the context.
+        :param buf: A writable Python buffer that the data will be written
+            into. This buffer should be ``len(data) + n - 1`` bytes where ``n``
+            is the block size (in bytes) of the cipher and mode combination.
+        :return int: Number of bytes written.
+        :raises NotImplementedError: This is raised if the version of ``cffi``
+            used is too old (this can happen on older PyPy releases).
+        :raises ValueError: This is raised if the supplied buffer is too small.
+
+        .. doctest::
+
+            >>> import os
+            >>> from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+            >>> from cryptography.hazmat.backends import default_backend
+            >>> backend = default_backend()
+            >>> key = os.urandom(32)
+            >>> iv = os.urandom(16)
+            >>> cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=backend)
+            >>> encryptor = cipher.encryptor()
+            >>> # the buffer needs to be at least len(data) + n - 1 where n is cipher/mode block size in bytes
+            >>> buf = bytearray(31)
+            >>> len_encrypted = encryptor.update_into(b"a secret message", buf)
+            >>> # get the ciphertext from the buffer reading only the bytes written to it (len_encrypted)
+            >>> ct = bytes(buf[:len_encrypted]) + encryptor.finalize()
+            >>> decryptor = cipher.decryptor()
+            >>> len_decrypted = decryptor.update_into(ct, buf)
+            >>> # get the plaintext from the buffer reading only the bytes written (len_decrypted)
+            >>> bytes(buf[:len_decrypted]) + decryptor.finalize()
+            'a secret message'
+
     .. method:: finalize()
 
         :return bytes: Returns the remainder of the data.
@@ -473,7 +517,7 @@ Interfaces
     :class:`~cryptography.hazmat.primitives.ciphers.modes.GCM`) the result will
     conform to the ``AEADCipherContext`` and ``CipherContext`` interfaces. If
     it is an encryption context it will additionally be an
-    ``AEADEncryptionContext`` provider. ``AEADCipherContext`` contains an
+    ``AEADEncryptionContext`` instance. ``AEADCipherContext`` contains an
     additional method :meth:`authenticate_additional_data` for adding
     additional authenticated but unencrypted data (see note below). You should
     call this before calls to ``update``. When you are done call ``finalize``
@@ -607,10 +651,10 @@ Interfaces used by the symmetric cipher modes described in
 
 .. _`described by Colin Percival`: http://www.daemonology.net/blog/2009-06-11-cryptographic-right-answers.html
 .. _`recommends a 96-bit IV length`: http://csrc.nist.gov/groups/ST/toolkit/BCM/documents/proposedmodes/gcm/gcm-spec.pdf
-.. _`NIST SP-800-38D`: http://csrc.nist.gov/publications/nistpubs/800-38D/SP-800-38D.pdf
+.. _`NIST SP-800-38D`: http://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38D.pdf
 .. _`Communications Security Establishment`: https://www.cse-cst.gc.ca
 .. _`encrypt`: https://ssd.eff.org/en/module/what-encryption
 .. _`CRYPTREC`: https://www.cryptrec.go.jp/english/
 .. _`significant patterns in the output`: https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Electronic_Codebook_.28ECB.29
 .. _`International Data Encryption Algorithm`: https://en.wikipedia.org/wiki/International_Data_Encryption_Algorithm
-.. _`OpenPGP`: http://www.openpgp.org
+.. _`OpenPGP`: http://openpgp.org

@@ -91,6 +91,40 @@ Key exchange
 * ``vectors/cryptography_vectors/asymmetric/DH/RFC5114.txt`` contains
   Diffie-Hellman examples from appendix A.1, A.2 and A.3 of :rfc:`5114`.
 
+* ``vectors/cryptography_vectors/asymmetric/DH/vec.txt`` contains
+  Diffie-Hellman examples from `botan`_.
+
+* ``vectors/cryptography_vectors/asymmetric/DH/bad_exchange.txt`` contains
+  Diffie-Hellman vector pairs that were generated using OpenSSL
+  ``DH_generate_parameters_ex`` and ``DH_generate_key``.
+
+* ``vectors/cryptography_vectors/asymmetric/DH/dhp.pem``,
+  ``vectors/cryptography_vectors/asymmetric/DH/dhkey.pem`` and
+  ``vectors/cryptography_vectors/asymmetric/DH/dhpub.pem`` contains
+  Diffie-Hellman parameters and key respectively. The keys were
+  generated using OpenSSL following `DHKE`_ guide.
+  ``vectors/cryptography_vectors/asymmetric/DH/dhkey.txt`` contains
+  all parameter in text.
+  ``vectors/cryptography_vectors/asymmetric/DH/dhp.der``,
+  ``vectors/cryptography_vectors/asymmetric/DH/dhkey.der`` and
+  ``vectors/cryptography_vectors/asymmetric/DH/dhpub.der`` contains
+  are the above parameters and keys in DER format.
+
+* ``vectors/cryptography_vectors/asymmetric/DH/dhp_rfc5114_2.pem``,
+  ``vectors/cryptography_vectors/asymmetric/DH/dhkey_rfc5114_2.pem`` and
+  ``vectors/cryptography_vectors/asymmetric/DH/dhpub_rfc5114_2.pem`` contains
+  Diffie-Hellman parameters and key respectively. The keys were
+  generated using OpenSSL following `DHKE`_ guide. When creating the
+  parameters we added the `-pkeyopt dh_rfc5114:2` option to use
+  RFC5114 2048 bit DH parameters with 224 bit subgroup.
+  ``vectors/cryptography_vectors/asymmetric/DH/dhkey_rfc5114_2.txt`` contains
+  all parameter in text.
+  ``vectors/cryptography_vectors/asymmetric/DH/dhp_rfc5114_2.der``,
+  ``vectors/cryptography_vectors/asymmetric/DH/dhkey_rfc5114_2.der`` and
+  ``vectors/cryptography_vectors/asymmetric/DH/dhpub_rfc5114_2.der`` contains
+  are the above parameters and keys in DER format.
+
+
 X.509
 ~~~~~
 
@@ -117,6 +151,11 @@ X.509
 * ``e-trust.ru.der`` - A certificate from a `Russian CA`_ signed using the GOST
   cipher and containing numerous unusual encodings such as NUMERICSTRING in
   the subject DN.
+* ``alternate-rsa-sha1-oid.pem`` - A certificate from an
+  `unknown signature OID`_ Mozilla bug that uses an alternate signature OID for
+  RSA with SHA1.
+* ``badssl-sct.pem`` - A certificate with the certificate transparency signed
+  certificate timestamp extension.
 
 Custom X.509 Vectors
 ~~~~~~~~~~~~~~~~~~~~
@@ -427,14 +466,14 @@ header format (substituting the correct information):
     # Verified against the CommonCrypto and Go crypto packages
     # Key Length : 128
 
-.. _`NIST`: http://www.nist.gov/
+.. _`NIST`: https://www.nist.gov/
 .. _`IETF`: https://www.ietf.org/
 .. _`NIST CAVP`: http://csrc.nist.gov/groups/STM/cavp/
 .. _`Bruce Schneier's vectors`: https://www.schneier.com/code/vectors.txt
 .. _`Camellia page`: https://info.isl.ntt.co.jp/crypt/eng/camellia/
 .. _`CRYPTREC`: https://www.cryptrec.go.jp
 .. _`OpenSSL's test vectors`: https://github.com/openssl/openssl/blob/97cf1f6c2854a3a955fd7dd3a1f113deba00c9ef/crypto/evp/evptests.txt#L232
-.. _`RIPEMD website`: http://homes.esat.kuleuven.be/~bosselae/ripemd160.html
+.. _`RIPEMD website`: https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
 .. _`Whirlpool website`: http://www.larc.usp.br/~pbarreto/WhirlpoolPage.html
 .. _`draft RFC`: https://tools.ietf.org/html/draft-josefsson-scrypt-kdf-01
 .. _`Specification repository`: https://github.com/fernet/spec
@@ -449,8 +488,8 @@ header format (substituting the correct information):
 .. _`GnuTLS example keys`: https://gitlab.com/gnutls/gnutls/commit/ad2061deafdd7db78fd405f9d143b0a7c579da7b
 .. _`NESSIE IDEA vectors`: https://www.cosic.esat.kuleuven.be/nessie/testvectors/bc/idea/Idea-128-64.verified.test-vectors
 .. _`NESSIE`: https://en.wikipedia.org/wiki/NESSIE
-.. _`Ed25519 website`: http://ed25519.cr.yp.to/software.html
-.. _`NIST SP-800-38B`: http://csrc.nist.gov/publications/nistpubs/800-38B/Updated_CMAC_Examples.pdf
+.. _`Ed25519 website`: https://ed25519.cr.yp.to/software.html
+.. _`NIST SP-800-38B`: http://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-38b.pdf
 .. _`NIST PKI Testing`: http://csrc.nist.gov/groups/ST/crypto_apps_infra/pki/pkitesting.html
 .. _`testx509.pem`: https://github.com/openssl/openssl/blob/master/test/testx509.pem
 .. _`DigiCert Global Root G3`: http://cacerts.digicert.com/DigiCertGlobalRootG3.crt
@@ -459,3 +498,6 @@ header format (substituting the correct information):
 .. _`Mozilla bug`: https://bugzilla.mozilla.org/show_bug.cgi?id=233586
 .. _`Russian CA`: https://e-trust.gosuslugi.ru/MainCA
 .. _`test/evptests.txt`: https://github.com/openssl/openssl/blob/2d0b44126763f989a4cbffbffe9d0c7518158bb7/test/evptests.txt
+.. _`unknown signature OID`: https://bugzilla.mozilla.org/show_bug.cgi?id=405966
+.. _`botan`: https://github.com/randombit/botan/blob/57789bdfc55061002b2727d0b32587612829a37c/src/tests/data/pubkey/dh.vec
+.. _`DHKE`: https://sandilands.info/sgordon/diffie-hellman-secret-key-exchange-with-openssl
