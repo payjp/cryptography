@@ -213,7 +213,7 @@ X509 *X509_STORE_CTX_get0_cert(X509_STORE_CTX *);
 
 CUSTOMIZATIONS = """
 /* OpenSSL 1.0.2beta2+ verification parameters and error codes */
-#if CRYPTOGRAPHY_OPENSSL_102BETA2_OR_GREATER && !CRYPTOGRAPHY_IS_LIBRESSL
+#if CRYPTOGRAPHY_OPENSSL_102BETA2_OR_GREATER
 static const long Cryptography_HAS_102_VERIFICATION_ERROR_CODES = 1;
 static const long Cryptography_HAS_102_VERIFICATION_PARAMS = 1;
 #else
